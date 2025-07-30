@@ -1,0 +1,600 @@
+<template>
+  <div class="bg-gray-50 min-h-screen">
+    
+    <div class="p-6">
+      <!-- Confirmation Dialog -->
+      <div v-if="showConfirmDialog" class="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-4" @click="cancelDelete">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 transform transition-all animate-scale-in" @click.stop>
+          <div class="p-6">
+            <div class="flex items-center mb-4">
+              <div class="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center mr-3">
+                <svg class="w-5 h-5 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                </svg>
+              </div>
+              <h3 class="text-lg font-semibold text-gray-900">Konfirmasi Hapus</h3>
+            </div>
+            
+            <p class="text-base text-gray-600 mb-6">
+              Apakah Anda yakin ingin menghapus distributor ini? Tindakan ini tidak dapat dibatalkan.
+            </p>
+            
+            <div class="flex gap-3">
+              <button
+                @click="cancelDelete"
+                class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-medium transition-colors duration-200"
+              >
+                Batal
+              </button>
+              <button
+                @click="confirmDelete"
+                class="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200"
+              >
+                Hapus
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Toast Notifications -->
+      <div class="fixed top-4 right-4 z-50 space-y-2 max-w-md">
+        <div 
+          v-for="toast in toasts" 
+          :key="toast.id"
+          :class="[
+            'transform transition-all duration-300 ease-in-out',
+            'bg-white rounded-lg shadow-lg border-l-4 p-4 w-full',
+            toast.type === 'success' ? 'border-green-500' : 'border-red-500',
+            'animate-slide-in-right'
+          ]"
+        >
+          <div class="flex items-start">
+            <div v-if="toast.type === 'success'" class="flex-shrink-0">
+              <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                <svg class="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                </svg>
+              </div>
+            </div>
+            
+            <div v-else class="flex-shrink-0">
+              <div class="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+                <svg class="w-5 h-5 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+                </svg>
+              </div>
+            </div>
+            
+            <div class="ml-3 flex-1 min-w-0">
+              <p :class="[
+                'text-sm font-medium',
+                toast.type === 'success' ? 'text-green-800' : 'text-red-800'
+              ]">
+                {{ toast.title }}
+              </p>
+              <p v-if="toast.message" :class="[
+                'text-sm mt-1',
+                toast.type === 'success' ? 'text-green-600' : 'text-red-600'
+              ]">
+                {{ toast.message }}
+              </p>
+            </div>
+            
+            <div class="ml-4 flex-shrink-0">
+              <button
+                @click="removeToast(toast.id)"
+                class="inline-flex text-gray-400 hover:text-gray-600 focus:outline-none focus:text-gray-600 transition-colors p-1"
+              >
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Breadcrumb -->
+      <nav aria-label="breadcrumb" class="mb-6">
+        <ol class="flex text-gray-600 text-sm space-x-2">
+          <li>
+            <router-link to="/admin/dashboard" class="hover:text-indigo-600 transition-colors">Home</router-link>
+          </li>
+          <li>/</li>
+          <li class="text-indigo-600 font-semibold">Distributor</li>
+        </ol>
+      </nav>
+
+      <!-- Header Section -->
+      <div class="bg-white rounded-lg shadow-sm p-6 mb-6">
+        <div class="flex justify-between items-center">
+          <h2 class="text-2xl font-bold text-gray-800">Data Distributor</h2>
+          <button 
+            @click="showForm = !showForm" 
+            class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg transition-colors duration-200 flex items-center gap-2"
+          >
+            <svg v-if="!showForm" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+            </svg>
+            <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+            {{ showForm ? 'Batal' : 'Tambah Distributor' }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Form Dialog -->
+      <div v-if="showForm" class="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-4" @click="closeForm">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 transform transition-all" @click.stop>
+          <div class="p-6">
+            <div class="flex justify-between items-center mb-6">
+              <h3 class="text-xl font-semibold text-gray-800">
+                {{ isEditMode ? 'Ubah Distributor' : 'Tambah Distributor Baru' }}
+              </h3>
+              <button @click="closeForm" class="text-gray-400 hover:text-gray-600 transition-colors p-1">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+              </button>
+            </div>
+
+            <form @submit.prevent="isEditMode ? updateDistributor() : addDistributor()">
+              <div class="mb-6">
+                <label for="nama" class="block text-sm font-medium text-gray-700 mb-2">Nama Distributor</label>
+                <input
+                  v-model="form.name"
+                  id="nama"
+                  type="text"
+                  placeholder="Masukkan nama distributor"
+                  class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+                  required
+                />
+              </div>
+
+              <div class="mb-6">
+                <label for="phone" class="block text-sm font-medium text-gray-700 mb-2">Nomor Telepon</label>
+                <input
+                  v-model="form.phone"
+                  id="phone"
+                  type="tel"
+                  placeholder="Masukkan nomor telepon"
+                  class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+                  required
+                />
+              </div>
+
+              <div class="mb-6">
+                <label for="address" class="block text-sm font-medium text-gray-700 mb-2">Alamat</label>
+                <textarea
+                  v-model="form.address"
+                  id="address"
+                  rows="3"
+                  placeholder="Masukkan alamat distributor"
+                  class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors resize-none"
+                  required
+                ></textarea>
+              </div>
+
+              <div class="flex gap-3">
+                <button 
+                  type="submit"
+                  class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-3 rounded-lg font-medium transition-colors duration-200"
+                >
+                  {{ isEditMode ? 'Simpan' : 'Simpan' }}
+                </button>
+                <button
+  type="button"
+  @click="closeForm"
+  class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-3 rounded-lg font-medium transition-colors duration-200"
+>
+  Batal
+</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+        <div class="bg-gray-50 px-6 py-4 border-b border-gray-200">
+          <h3 class="text-lg font-semibold text-gray-800">Daftar Distributor</h3>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama Distributor</th>
+                <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Telepon</th>
+                <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Alamat</th>
+                <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tanggal Dibuat</th>
+                <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+              <tr v-for="item in distributors" :key="item.id" class="hover:bg-gray-50 transition-colors">
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                    #{{ item.id }}
+                  </span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <div class="text-sm font-medium text-gray-900">{{ item.name }}</div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {{ item.phone }}
+                </td>
+                <td class="px-6 py-4">
+                  <div class="text-sm text-gray-500 max-w-xs truncate">{{ item.address }}</div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {{ formatDate(item.created_at) }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                  <div class="flex gap-2">
+                    <button 
+                      @click="editDistributor(item)" 
+                      class="inline-flex items-center px-3 py-1 border border-transparent text-sm leading-4 font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
+                    >
+                      <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                      </svg>
+                      Ubah
+                    </button>
+                    
+                    <button 
+                      @click="hapus(item.id)" 
+                      class="inline-flex items-center px-3 py-1 border border-transparent text-sm leading-4 font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200"
+                    >
+                      <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                      </svg>
+                      Hapus
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        
+        <!-- Empty State -->
+        <div v-if="distributors.length === 0" class="text-center py-12 px-4">
+          <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2M4 13h2m13-8l-5 5m0 0l-5-5m5 5V3"></path>
+          </svg>
+          <h3 class="mt-2 text-sm font-medium text-gray-900">Belum ada data distributor</h3>
+          <p class="mt-1 text-sm text-gray-500">Mulai dengan menambahkan distributor pertama Anda.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+import axios from 'axios'
+export default {
+  name: 'Distributor',
+  data() {
+    return {
+      currentUser: {
+        name: '',
+        role: ''
+      },
+      distributors: [],
+      form: {
+        id: null,
+        name: '',
+        phone: '',
+        address: ''
+      },
+      showForm: false,
+      isEditMode: false,
+      toasts: [],
+      toastId: 0,
+      showConfirmDialog: false,
+      deleteItemId: null
+    }
+  },
+  
+  mounted() {
+    this.fetchUserData()
+    this.getDistributors()
+  },
+  
+  methods: {
+    async fetchUserData() {
+      try {
+        const token = localStorage.getItem('token')
+        if (!token) {
+          this.$router.push('/login')
+          return
+        }
+
+        const userRes = await axios.get('http://localhost:8000/api/user', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        
+        this.currentUser = userRes.data.data || { name: 'User', role: 'Guest' }
+      } catch (error) {
+        console.error('Error fetching user data:', error)
+        if (error.response?.status === 401) {
+          localStorage.removeItem('token')
+          this.$router.push('/login')
+        }
+      }
+    },
+
+    // Toast Methods
+    showToast(type, title, message = null, duration = 4000) {
+      const id = ++this.toastId
+      const toast = {
+        id,
+        type,
+        title,
+        message
+      }
+
+      this.toasts.push(toast)
+
+      setTimeout(() => {
+        this.removeToast(id)
+      }, duration)
+
+      return id
+    },
+
+    removeToast(id) {
+      const index = this.toasts.findIndex(toast => toast.id === id)
+      if (index > -1) {
+        this.toasts.splice(index, 1)
+      }
+    },
+
+    // Format Date
+    formatDate(dateString) {
+      if (!dateString) return '-'
+      const date = new Date(dateString)
+      return date.toLocaleDateString('id-ID', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      })
+    },
+
+    // Get All Distributors
+    async getDistributors() {
+      const token = localStorage.getItem('token')
+      try {
+        const response = await axios.get('http://localhost:8000/api/distributor', {
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        })
+        
+        if (response.data.success) {
+          this.distributors = response.data.data
+        } else {
+          this.showToast('error', 'Gagal Memuat Data', response.data.message)
+        }
+      } catch (error) {
+        console.error('Error fetching distributors:', error)
+        this.showToast('error', 'Gagal Memuat Data', 'Terjadi kesalahan saat memuat data distributor')
+      }
+    },
+
+    // Add Distributor
+    async addDistributor() {
+      const token = localStorage.getItem('token')
+      
+      if (!this.form.name.trim()) {
+        this.showToast('error', 'Validasi Error', 'Nama distributor harus diisi!')
+        return
+      }
+
+      if (!this.form.phone.trim()) {
+        this.showToast('error', 'Validasi Error', 'Nomor telepon harus diisi!')
+        return
+      }
+
+      if (!this.form.address.trim()) {
+        this.showToast('error', 'Validasi Error', 'Alamat harus diisi!')
+        return
+      }
+
+      const formData = {
+        name: this.form.name.trim(),
+        phone: this.form.phone.trim(),
+        address: this.form.address.trim()
+      }
+
+      try {
+        const response = await axios.post('http://localhost:8000/api/distributor', formData, {
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        })
+
+        if (response.data.success) {
+          this.resetForm()
+          this.closeForm()
+          this.getDistributors()
+          this.showToast('success', 'Berhasil!', response.data.message)
+        } else {
+          this.showToast('error', 'Gagal Menambah Distributor', response.data.message)
+        }
+      } catch (error) {
+        console.error('Error adding distributor:', error)
+        if (error.response?.data?.errors) {
+          const errors = error.response.data.errors
+          const errorMessage = Object.values(errors).flat().join(', ')
+          this.showToast('error', 'Gagal Menambah Distributor', errorMessage)
+        } else if (error.response?.data?.message) {
+          this.showToast('error', 'Gagal Menambah Distributor', error.response.data.message)
+        } else {
+          this.showToast('error', 'Gagal Menambah Distributor', 'Terjadi kesalahan saat menambahkan distributor')
+        }
+      }
+    },
+
+    // Edit Distributor (Open Form)
+    editDistributor(item) {
+      this.form.id = item.id
+      this.form.name = item.name
+      this.form.phone = item.phone
+      this.form.address = item.address
+      this.isEditMode = true
+      this.showForm = true
+    },
+
+    // Update Distributor
+    async updateDistributor() {
+      const token = localStorage.getItem('token')
+      
+      if (!this.form.name.trim()) {
+        this.showToast('error', 'Validasi Error', 'Nama distributor harus diisi!')
+        return
+      }
+
+      if (!this.form.phone.trim()) {
+        this.showToast('error', 'Validasi Error', 'Nomor telepon harus diisi!')
+        return
+      }
+
+      if (!this.form.address.trim()) {
+        this.showToast('error', 'Validasi Error', 'Alamat harus diisi!')
+        return
+      }
+
+      const formData = {
+        name: this.form.name.trim(),
+        phone: this.form.phone.trim(),
+        address: this.form.address.trim()
+      }
+
+      try {
+        const response = await axios.put(`http://localhost:8000/api/distributor/${this.form.id}`, formData, {
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        })
+
+        if (response.data.success) {
+          this.resetForm()
+          this.closeForm()
+          this.getDistributors()
+          this.showToast('success', 'Berhasil!', response.data.message)
+        } else {
+          this.showToast('error', 'Gagal Update Distributor', response.data.message)
+        }
+      } catch (error) {
+        console.error('Error updating distributor:', error)
+        if (error.response?.data?.errors) {
+          const errors = error.response.data.errors
+          const errorMessage = Object.values(errors).flat().join(', ')
+          this.showToast('error', 'Gagal Update Distributor', errorMessage)
+        } else if (error.response?.data?.message) {
+          this.showToast('error', 'Gagal Update Distributor', error.response.data.message)
+        } else {
+          this.showToast('error', 'Gagal Update Distributor', 'Terjadi kesalahan saat mengupdate distributor')
+        }
+      }
+    },
+
+    // Delete Distributor (Show Confirmation)
+    hapus(id) {
+      this.deleteItemId = id
+      this.showConfirmDialog = true
+    },
+
+    // Confirm Delete
+    async confirmDelete() {
+      const token = localStorage.getItem('token')
+      try {
+        const response = await axios.delete(`http://localhost:8000/api/distributor/${this.deleteItemId}`, {
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        })
+
+        if (response.data.success) {
+          this.getDistributors()
+          this.showToast('success', 'Berhasil!', response.data.message)
+        } else {
+          this.showToast('error', 'Gagal Hapus Distributor', response.data.message)
+        }
+      } catch (error) {
+        console.error('Error deleting distributor:', error)
+        if (error.response?.data?.message) {
+          this.showToast('error', 'Gagal Hapus Distributor', error.response.data.message)
+        } else {
+          this.showToast('error', 'Gagal Hapus Distributor', 'Terjadi kesalahan saat menghapus distributor')
+        }
+      } finally {
+        this.cancelDelete()
+      }
+    },
+
+    // Cancel Delete
+    cancelDelete() {
+      this.showConfirmDialog = false
+      this.deleteItemId = null
+    },
+
+    // Reset Form
+    resetForm() {
+      this.form.id = null
+      this.form.name = ''
+      this.form.phone = ''
+      this.form.address = ''
+    },
+
+    // Close Form
+    closeForm() {
+      this.showForm = false
+      this.isEditMode = false
+      this.resetForm()
+    }
+  }
+}
+</script>
+
+<style scoped>
+@keyframes slide-in-right {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.3s ease-out;
+}
+
+@keyframes scale-in {
+  from {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-scale-in {
+  animation: scale-in 0.2s ease-out;
+}
+</style>
