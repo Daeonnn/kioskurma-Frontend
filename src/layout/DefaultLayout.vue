@@ -31,8 +31,7 @@ import Sidebar from '../components/sidebar.vue'
 import AppHeader from '../components/appheader.vue'
 import IdleWarningModal from '../components/IdleWarningModal.vue'
 import { useIdleTimer } from '../composables/useIdleTimer'
-import axios from 'axios'
-
+import api from '../../services/api' 
 export default {
   name: 'AdminLayout',
   components: {
@@ -63,13 +62,8 @@ export default {
           return
         }
 
-        const response = await axios.get('http://localhost:8000/api/user', {
-          headers: { 
-            'Authorization': `Bearer ${token}`,
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          }
-        })
+        // ✅ Ganti dari axios ke api
+        const response = await api.get('/user')
         
         const userData = response.data.data || response.data
         

@@ -116,8 +116,8 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue' 
 import { useRouter } from 'vue-router'
-import axios from 'axios'
 import bgLogin from '../assets/logo/bg-login.png'
+import api from '../../services/api'
 
 const router = useRouter()
 
@@ -194,7 +194,7 @@ const handleLogin = async () => {
 
     console.log('Making login request...')
     
-    const response = await axios.post('http://localhost:8000/api/auth/login', {
+    const response = await api.post('/auth/login', {
       username: loginForm.value.username,
       password: loginForm.value.password
     })

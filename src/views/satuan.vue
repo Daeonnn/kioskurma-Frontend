@@ -239,7 +239,7 @@
 </template>
 
 <script>
-import axios from 'axios'
+import api from '../../services/api'; 
 
 export default {
   data() {
@@ -257,208 +257,175 @@ export default {
       toastId: 0,
       showConfirmDialog: false,
       deleteItemId: null
-    }
+    };
   },
-  methods: {
-    // Toast Methods
-    showToast(type, title, message = null, duration = 4000) {
-      const id = ++this.toastId
-      const toast = { id, type, title, message }
-      this.toasts.push(toast)
 
-      setTimeout(() => {
-        this.removeToast(id)
-      }, duration)
+  mounted() {
+    this.getSatuan();
+  },
+
+  methods: {
+    // === Toast Methods ===
+    showToast(type, title, message = null, duration = 4000) {
+      const id = ++this.toastId;
+      const toast = { id, type, title, message };
+      this.toasts.push(toast);
+      setTimeout(() => this.removeToast(id), duration);
     },
 
     removeToast(id) {
-      const index = this.toasts.findIndex(toast => toast.id === id)
-      if (index > -1) {
-        this.toasts.splice(index, 1)
-      }
+      const index = this.toasts.findIndex(t => t.id === id);
+      if (index > -1) this.toasts.splice(index, 1);
     },
 
-    // Format date
+    // === Format Date ===
     formatDate(dateString) {
-      if (!dateString) return '-'
-      const date = new Date(dateString)
+      if (!dateString) return '-';
+      const date = new Date(dateString);
       return date.toLocaleDateString('id-ID', {
         year: 'numeric',
         month: 'long',
         day: 'numeric'
-      })
+      });
     },
 
-    // Get all satuan
+    // === Get All Satuan ===
     async getSatuan() {
-      const token = localStorage.getItem('token')
-      
       try {
-        const response = await axios.get('http://localhost:8000/api/satuan', {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-        
+        const response = await api.get('/satuan');
         if (response.data.success) {
-          this.satuan = response.data.data
+          this.satuan = response.data.data;
         } else {
-          this.showToast('error', 'Gagal Memuat Data', response.data.message)
+          this.showToast('error', 'Gagal Memuat Data', response.data.message);
         }
       } catch (error) {
-        console.error('Error fetching satuan:', error)
-        const message = error.response?.data?.message || 'Terjadi kesalahan saat memuat data'
-        this.showToast('error', 'Gagal Memuat Data', message)
+        console.error('Error fetching satuan:', error);
+        const message = error.response?.data?.message || 'Terjadi kesalahan saat memuat data satuan';
+        this.showToast('error', 'Gagal Memuat Data', message);
       }
     },
 
-    // Add new satuan
+    // === Add Satuan ===
     async addSatuan() {
-      const token = localStorage.getItem('token')
-      this.isSubmitting = true
-      this.errors = {}
+      this.isSubmitting = true;
+      this.errors = {};
 
       try {
-        const response = await axios.post('http://localhost:8000/api/satuan', {
-          name: this.form.name
-        }, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-
+        const response = await api.post('/satuan', { name: this.form.name.trim() });
         if (response.data.success) {
-          this.showToast('success', 'Berhasil!', response.data.message)
-          this.resetForm()
-          this.closeForm()
-          this.getSatuan()
+          this.showToast('success', 'Berhasil!', response.data.message);
+          this.resetForm();
+          this.closeForm();
+          this.getSatuan();
         } else {
-          this.showToast('error', 'Gagal Menambah Satuan', response.data.message)
+          this.showToast('error', 'Gagal Menambah Satuan', response.data.message);
         }
       } catch (error) {
-        console.error('Error adding satuan:', error)
-        
+        console.error('Error adding satuan:', error);
         if (error.response?.status === 422) {
-          // Validation errors
-          this.errors = error.response.data.errors || {}
-          this.showToast('error', 'Validasi Error', 'Periksa kembali data yang diinput')
+          this.errors = error.response.data.errors || {};
+          this.showToast('error', 'Validasi Error', 'Periksa kembali data yang diinput');
         } else {
-          const message = error.response?.data?.message || 'Terjadi kesalahan saat menambahkan satuan'
-          this.showToast('error', 'Gagal Menambah Satuan', message)
+          const message = error.response?.data?.message || 'Terjadi kesalahan saat menambahkan satuan';
+          this.showToast('error', 'Gagal Menambah Satuan', message);
         }
       } finally {
-        this.isSubmitting = false
+        this.isSubmitting = false;
       }
     },
 
-    // Edit satuan
+    // === Edit Satuan ===
     editSatuan(item) {
-      this.form.id = item.id
-      this.form.name = item.name
-      this.isEditMode = true
-      this.showForm = true
-      this.errors = {}
+      this.form.id = item.id;
+      this.form.name = item.name;
+      this.isEditMode = true;
+      this.showForm = true;
+      this.errors = {};
     },
 
-    // Update satuan
+    // === Update Satuan ===
     async updateSatuan() {
-      const token = localStorage.getItem('token')
-      this.isSubmitting = true
-      this.errors = {}
+      this.isSubmitting = true;
+      this.errors = {};
 
       try {
-        const response = await axios.put(`http://localhost:8000/api/satuan/${this.form.id}`, {
-          name: this.form.name
-        }, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-
+        const response = await api.put(`/satuan/${this.form.id}`, { name: this.form.name.trim() });
         if (response.data.success) {
-          this.showToast('success', 'Berhasil!', response.data.message)
-          this.resetForm()
-          this.closeForm()
-          this.getSatuan()
+          this.showToast('success', 'Berhasil!', response.data.message);
+          this.resetForm();
+          this.closeForm();
+          this.getSatuan();
         } else {
-          this.showToast('error', 'Gagal Update Satuan', response.data.message)
+          this.showToast('error', 'Gagal Update Satuan', response.data.message);
         }
       } catch (error) {
-        console.error('Error updating satuan:', error)
-        
+        console.error('Error updating satuan:', error);
         if (error.response?.status === 422) {
-          // Validation errors
-          this.errors = error.response.data.errors || {}
-          this.showToast('error', 'Validasi Error', 'Periksa kembali data yang diinput')
+          this.errors = error.response.data.errors || {};
+          this.showToast('error', 'Validasi Error', 'Periksa kembali data yang diinput');
         } else if (error.response?.status === 404) {
-          this.showToast('error', 'Satuan Tidak Ditemukan', 'Data satuan yang akan diupdate tidak ditemukan')
+          this.showToast('error', 'Satuan Tidak Ditemukan', 'Data satuan yang akan diupdate tidak ditemukan');
         } else {
-          const message = error.response?.data?.message || 'Terjadi kesalahan saat mengupdate satuan'
-          this.showToast('error', 'Gagal Update Satuan', message)
+          const message = error.response?.data?.message || 'Terjadi kesalahan saat mengupdate satuan';
+          this.showToast('error', 'Gagal Update Satuan', message);
         }
       } finally {
-        this.isSubmitting = false
+        this.isSubmitting = false;
       }
     },
 
-    // Show delete confirmation
+    // === Delete Confirmation ===
     hapus(id) {
-      this.deleteItemId = id
-      this.showConfirmDialog = true
+      this.deleteItemId = id;
+      this.showConfirmDialog = true;
     },
 
-    // Confirm delete
+    // === Confirm Delete ===
     async confirmDelete() {
-      const token = localStorage.getItem('token')
-      
       try {
-        const response = await axios.delete(`http://localhost:8000/api/satuan/${this.deleteItemId}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-
+        const response = await api.delete(`/satuan/${this.deleteItemId}`);
         if (response.data.success) {
-          this.showToast('success', 'Berhasil!', response.data.message)
-          this.getSatuan()
+          this.showToast('success', 'Berhasil!', response.data.message);
+          this.getSatuan();
         } else {
-          this.showToast('error', 'Gagal Hapus Satuan', response.data.message)
+          this.showToast('error', 'Gagal Hapus Satuan', response.data.message);
         }
       } catch (error) {
-        console.error('Error deleting satuan:', error)
-        
+        console.error('Error deleting satuan:', error);
         if (error.response?.status === 404) {
-          this.showToast('error', 'Satuan Tidak Ditemukan', 'Data satuan yang akan dihapus tidak ditemukan')
+          this.showToast('error', 'Satuan Tidak Ditemukan', 'Data satuan yang akan dihapus tidak ditemukan');
         } else if (error.response?.status === 400) {
-          // Satuan masih digunakan
-          const message = error.response.data.message || 'Tidak dapat menghapus satuan yang masih digunakan'
-          this.showToast('error', 'Gagal Hapus Satuan', message)
+          const message = error.response.data.message || 'Tidak dapat menghapus satuan yang masih digunakan';
+          this.showToast('error', 'Gagal Hapus Satuan', message);
         } else {
-          const message = error.response?.data?.message || 'Terjadi kesalahan saat menghapus satuan'
-          this.showToast('error', 'Gagal Hapus Satuan', message)
+          const message = error.response?.data?.message || 'Terjadi kesalahan saat menghapus satuan';
+          this.showToast('error', 'Gagal Hapus Satuan', message);
         }
       } finally {
-        this.cancelDelete()
+        this.cancelDelete();
       }
     },
 
-    // Cancel delete
+    // === Cancel Delete ===
     cancelDelete() {
-      this.showConfirmDialog = false
-      this.deleteItemId = null
+      this.showConfirmDialog = false;
+      this.deleteItemId = null;
     },
 
-    // Reset form
+    // === Reset & Close Form ===
     resetForm() {
-      this.form.id = null
-      this.form.name = ''
-      this.errors = {}
+      this.form.id = null;
+      this.form.name = '';
+      this.errors = {};
     },
 
-    // Close form
     closeForm() {
-      this.showForm = false
-      this.isEditMode = false
-      this.resetForm()
+      this.showForm = false;
+      this.isEditMode = false;
+      this.resetForm();
     }
-  },
-  
-  mounted() {
-    this.getSatuan()
   }
-}
+};
 </script>
 
 <style scoped>

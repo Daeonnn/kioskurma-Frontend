@@ -54,7 +54,7 @@ import KasirHeader from '../components/kasir/kasirheader.vue'
 import KasirSidebar from '../components/kasir/kasirsidebar.vue'
 import IdleWarningModal from '../components/IdleWarningModal.vue'
 import { useIdleTimer } from '../composables/useIdleTimer'
-import axios from 'axios'
+import api from '../../services/api' 
 
 export default {
   name: 'KasirLayout',
@@ -77,7 +77,7 @@ export default {
       timeLeft, 
       extendSession, 
       logout 
-    } = useIdleTimer(5)
+    } = useIdleTimer(5) // 5 menit idle
     
     // Mobile menu functions
     const toggleMobileMenu = () => {
@@ -96,7 +96,7 @@ export default {
       isMobileMenuOpen.value ? 'sidebar-open' : 'sidebar-closed'
     ])
     
-    // Fetch user data and role verification
+    // Fetch user data
     const fetchUserData = async () => {
       try {
         const token = localStorage.getItem('token')
@@ -105,13 +105,8 @@ export default {
           return
         }
 
-        const response = await axios.get('http://localhost:8000/api/user', {
-          headers: { 
-            'Authorization': `Bearer ${token}`,
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          }
-        })
+        // ✅ Ganti dari axios ke api
+        const response = await api.get('/user')
         
         const userData = response.data.data || response.data
         
@@ -190,7 +185,6 @@ export default {
   }
 }
 </script>
-
 <style scoped>
 /* Main Layout Container */
 .kasir-layout {

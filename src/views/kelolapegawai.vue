@@ -321,7 +321,7 @@
 </template>
 
 <script>
-import axios from 'axios'
+import api from '../../services/api'; 
 
 export default {
   name: 'EmployeeManagement',
@@ -347,15 +347,13 @@ export default {
       deleteItemId: null
     }
   },
+
   methods: {
     showToast(type, title, message = null, duration = 4000) {
       const id = ++this.toastId
       const toast = { id, type, title, message }
       this.toasts.push(toast)
-
-      setTimeout(() => {
-        this.removeToast(id)
-      }, duration)
+      setTimeout(() => this.removeToast(id), duration)
     },
 
     removeToast(id) {
@@ -375,14 +373,10 @@ export default {
       })
     },
 
+    // === Get Employees ===
     async getEmployees() {
-      const token = localStorage.getItem('token')
-      
       try {
-        const response = await axios.get('http://localhost:8000/api/users', {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-        
+        const response = await api.get('/users') // ✅ Ganti: tidak pakai localhost
         if (response.data.success) {
           this.employees = response.data.data
         } else {
@@ -395,21 +389,19 @@ export default {
       }
     },
 
+    // === Add Employee ===
     async addEmployee() {
-      const token = localStorage.getItem('token')
       this.isSubmitting = true
       this.errors = {}
 
       try {
-        const response = await axios.post('http://localhost:8000/api/users', {
+        const response = await api.post('/users', { // ✅ Ganti
           name: this.form.name,
           username: this.form.username,
           email: this.form.email,
           password: this.form.password,
           password_confirmation: this.form.password_confirmation,
           role: this.form.role,
-        }, {
-          headers: { Authorization: `Bearer ${token}` }
         })
 
         if (response.data.success) {
@@ -422,7 +414,6 @@ export default {
         }
       } catch (error) {
         console.error('Error adding employee:', error)
-        
         if (error.response?.status === 422) {
           this.errors = error.response.data.errors || {}
           this.showToast('error', 'Validasi Error', 'Periksa kembali data yang diinput')
@@ -435,6 +426,7 @@ export default {
       }
     },
 
+    // === Edit Employee ===
     editEmployee(employee) {
       this.form.id = employee.id
       this.form.name = employee.name
@@ -448,8 +440,8 @@ export default {
       this.errors = {}
     },
 
+    // === Update Employee ===
     async updateEmployee() {
-      const token = localStorage.getItem('token')
       this.isSubmitting = true
       this.errors = {}
 
@@ -466,9 +458,7 @@ export default {
       }
 
       try {
-        const response = await axios.put(`http://localhost:8000/api/users/${this.form.id}`, updateData, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
+        const response = await api.put(`/users/${this.form.id}`, updateData) // ✅ Ganti
 
         if (response.data.success) {
           this.showToast('success', 'Berhasil!', response.data.message)
@@ -480,7 +470,6 @@ export default {
         }
       } catch (error) {
         console.error('Error updating employee:', error)
-        
         if (error.response?.status === 422) {
           this.errors = error.response.data.errors || {}
           this.showToast('error', 'Validasi Error', 'Periksa kembali data yang diinput')
@@ -495,18 +484,15 @@ export default {
       }
     },
 
+    // === Delete Employee ===
     deleteEmployee(id) {
       this.deleteItemId = id
       this.showConfirmDialog = true
     },
 
     async confirmDelete() {
-      const token = localStorage.getItem('token')
-      
       try {
-        const response = await axios.delete(`http://localhost:8000/api/users/${this.deleteItemId}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
+        const response = await api.delete(`/users/${this.deleteItemId}`) // ✅ Ganti
 
         if (response.data.success) {
           this.showToast('success', 'Berhasil!', response.data.message)
@@ -516,7 +502,6 @@ export default {
         }
       } catch (error) {
         console.error('Error deleting employee:', error)
-        
         if (error.response?.status === 404) {
           this.showToast('error', 'Pegawai Tidak Ditemukan', 'Data pegawai yang akan dihapus tidak ditemukan')
         } else {
@@ -550,7 +535,7 @@ export default {
       this.resetForm()
     }
   },
-  
+
   mounted() {
     this.getEmployees()
   }

@@ -94,7 +94,7 @@
 </template>
 
 <script>
-import axios from 'axios'
+import api from '../../services/api'; 
 
 export default {
   data() {
@@ -107,59 +107,58 @@ export default {
       },
       lowStockProducts: [],
       currentUserName: ''
-    }
+    };
   },
 
   methods: {
+    // Ambil data produk untuk dashboard
     async fetchDashboardData() {
       try {
-        const token = localStorage.getItem('token')
-        const productsRes = await axios.get('http://localhost:8000/api/products', {
-          headers: { Authorization: `Bearer ${token}` }
-        })
+        const response = await api.get('/products'); // Otomatis bawa token
+        const products = response.data.data || [];
 
-        const products = productsRes.data.data || []
-        this.calculateStats(products)
+        this.calculateStats(products);
       } catch (error) {
-        console.error('Error fetching dashboard data:', error)
+        console.error('Error fetching dashboard data:', error);
+        // Bisa tambah toast error jika perlu
       }
     },
 
+    // Hitung statistik
     calculateStats(products) {
-      this.stats.totalProducts = products.length
-      this.stats.availableStock = products.filter(p => p.stock > 10).length
-      this.stats.lowStock = products.filter(p => p.stock > 0 && p.stock <= 10).length
-      this.stats.outOfStock = products.filter(p => p.stock === 0).length
+      this.stats.totalProducts = products.length;
+
+      this.stats.availableStock = products.filter(p => p.stock > 10).length;
+      this.stats.lowStock = products.filter(p => p.stock > 0 && p.stock <= 10).length;
+      this.stats.outOfStock = products.filter(p => p.stock === 0).length;
 
       this.lowStockProducts = products
         .filter(p => p.stock > 0 && p.stock <= 10)
         .sort((a, b) => a.stock - b.stock)
-        .slice(0, 5)
+        .slice(0, 5);
     },
 
+    // Ambil nama user
     async fetchUserName() {
       try {
-        const token = localStorage.getItem('token')
-        const response = await axios.get('http://localhost:8000/api/user', {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        })
-
-        const userData = response.data.data || response.data
-        this.currentUserName = userData.name || 'Pengguna'
+        const response = await api.get('/user');
+        const userData = response.data.data || response.data;
+        this.currentUserName = userData.name || 'Pengguna';
       } catch (error) {
-        console.error('Gagal mengambil data user:', error)
-        this.currentUserName = 'Pengguna'
+        console.error('Gagal mengambil data user:', error);
+        this.currentUserName = 'Pengguna';
       }
     }
   },
 
   async mounted() {
-    await this.fetchDashboardData()
-    await this.fetchUserName()
+    // Jalankan kedua async function secara paralel untuk lebih cepat
+    await Promise.all([
+      this.fetchDashboardData(),
+      this.fetchUserName()
+    ]);
   }
-}
+};
 </script>
 
 <style scoped>

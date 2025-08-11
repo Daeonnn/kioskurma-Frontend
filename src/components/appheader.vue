@@ -44,7 +44,7 @@
 </template>
 
 <script>
-import axios from 'axios'
+import api from '../../services/api'; 
 import { ArrowRightOnRectangleIcon, ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
 
 export default {
@@ -103,13 +103,8 @@ export default {
 
         console.log('Fetching user data with token:', token.substring(0, 20) + '...')
         
-        const response = await axios.get('http://localhost:8000/api/user', {
-          headers: { 
-            'Authorization': `Bearer ${token}`,
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          }
-        })
+        // ✅ Ganti dari axios ke api
+        const response = await api.get('/user')
         
         console.log('API Response:', response.data)
         

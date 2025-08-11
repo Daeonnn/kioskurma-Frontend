@@ -239,7 +239,7 @@
 </template>
 
 <script>
-import axios from 'axios'
+import api from '../../services/api'; 
 
 export default {
   data() {
@@ -257,208 +257,175 @@ export default {
       toastId: 0,
       showConfirmDialog: false,
       deleteItemId: null
-    }
+    };
   },
-  methods: {
-    // Toast Methods
-    showToast(type, title, message = null, duration = 4000) {
-      const id = ++this.toastId
-      const toast = { id, type, title, message }
-      this.toasts.push(toast)
 
-      setTimeout(() => {
-        this.removeToast(id)
-      }, duration)
+  mounted() {
+    this.getJenis();
+  },
+
+  methods: {
+    // === Toast Methods ===
+    showToast(type, title, message = null, duration = 4000) {
+      const id = ++this.toastId;
+      const toast = { id, type, title, message };
+      this.toasts.push(toast);
+      setTimeout(() => this.removeToast(id), duration);
     },
 
     removeToast(id) {
-      const index = this.toasts.findIndex(toast => toast.id === id)
-      if (index > -1) {
-        this.toasts.splice(index, 1)
-      }
+      const index = this.toasts.findIndex(t => t.id === id);
+      if (index > -1) this.toasts.splice(index, 1);
     },
 
-    // Format date
+    // === Format Date ===
     formatDate(dateString) {
-      if (!dateString) return '-'
-      const date = new Date(dateString)
+      if (!dateString) return '-';
+      const date = new Date(dateString);
       return date.toLocaleDateString('id-ID', {
         year: 'numeric',
         month: 'long',
         day: 'numeric'
-      })
+      });
     },
 
-    // Get all jenis
+    // === Get All Jenis ===
     async getJenis() {
-      const token = localStorage.getItem('token')
-      
       try {
-        const response = await axios.get('http://localhost:8000/api/jenis', {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-        
+        const response = await api.get('/jenis');
         if (response.data.success) {
-          this.jenis = response.data.data
+          this.jenis = response.data.data;
         } else {
-          this.showToast('error', 'Gagal Memuat Data', response.data.message)
+          this.showToast('error', 'Gagal Memuat Data', response.data.message);
         }
       } catch (error) {
-        console.error('Error fetching jenis:', error)
-        const message = error.response?.data?.message || 'Terjadi kesalahan saat memuat data'
-        this.showToast('error', 'Gagal Memuat Data', message)
+        console.error('Error fetching jenis:', error);
+        const message = error.response?.data?.message || 'Terjadi kesalahan saat memuat data jenis';
+        this.showToast('error', 'Gagal Memuat Data', message);
       }
     },
 
-    // Add new jenis
+    // === Add Jenis ===
     async addJenis() {
-      const token = localStorage.getItem('token')
-      this.isSubmitting = true
-      this.errors = {}
+      this.isSubmitting = true;
+      this.errors = {};
 
       try {
-        const response = await axios.post('http://localhost:8000/api/jenis', {
-          name: this.form.name
-        }, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-
+        const response = await api.post('/jenis', { name: this.form.name.trim() });
         if (response.data.success) {
-          this.showToast('success', 'Berhasil!', response.data.message)
-          this.resetForm()
-          this.closeForm()
-          this.getJenis()
+          this.showToast('success', 'Berhasil!', response.data.message);
+          this.resetForm();
+          this.closeForm();
+          this.getJenis();
         } else {
-          this.showToast('error', 'Gagal Menambah Jenis', response.data.message)
+          this.showToast('error', 'Gagal Menambah Jenis', response.data.message);
         }
       } catch (error) {
-        console.error('Error adding jenis:', error)
-        
+        console.error('Error adding jenis:', error);
         if (error.response?.status === 422) {
-          // Validation errors
-          this.errors = error.response.data.errors || {}
-          this.showToast('error', 'Validasi Error', 'Periksa kembali data yang diinput')
+          this.errors = error.response.data.errors || {};
+          this.showToast('error', 'Validasi Error', 'Periksa kembali data yang diinput');
         } else {
-          const message = error.response?.data?.message || 'Terjadi kesalahan saat menambahkan jenis'
-          this.showToast('error', 'Gagal Menambah Jenis', message)
+          const message = error.response?.data?.message || 'Terjadi kesalahan saat menambahkan jenis';
+          this.showToast('error', 'Gagal Menambah Jenis', message);
         }
       } finally {
-        this.isSubmitting = false
+        this.isSubmitting = false;
       }
     },
 
-    // Edit jenis
+    // === Edit Jenis ===
     editJenis(item) {
-      this.form.id = item.id
-      this.form.name = item.name
-      this.isEditMode = true
-      this.showForm = true
-      this.errors = {}
+      this.form.id = item.id;
+      this.form.name = item.name;
+      this.isEditMode = true;
+      this.showForm = true;
+      this.errors = {};
     },
 
-    // Update jenis
+    // === Update Jenis ===
     async updateJenis() {
-      const token = localStorage.getItem('token')
-      this.isSubmitting = true
-      this.errors = {}
+      this.isSubmitting = true;
+      this.errors = {};
 
       try {
-        const response = await axios.put(`http://localhost:8000/api/jenis/${this.form.id}`, {
-          name: this.form.name
-        }, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-
+        const response = await api.put(`/jenis/${this.form.id}`, { name: this.form.name.trim() });
         if (response.data.success) {
-          this.showToast('success', 'Berhasil!', response.data.message)
-          this.resetForm()
-          this.closeForm()
-          this.getJenis()
+          this.showToast('success', 'Berhasil!', response.data.message);
+          this.resetForm();
+          this.closeForm();
+          this.getJenis();
         } else {
-          this.showToast('error', 'Gagal Update Jenis', response.data.message)
+          this.showToast('error', 'Gagal Update Jenis', response.data.message);
         }
       } catch (error) {
-        console.error('Error updating jenis:', error)
-        
+        console.error('Error updating jenis:', error);
         if (error.response?.status === 422) {
-          // Validation errors
-          this.errors = error.response.data.errors || {}
-          this.showToast('error', 'Validasi Error', 'Periksa kembali data yang diinput')
+          this.errors = error.response.data.errors || {};
+          this.showToast('error', 'Validasi Error', 'Periksa kembali data yang diinput');
         } else if (error.response?.status === 404) {
-          this.showToast('error', 'Jenis Tidak Ditemukan', 'Data jenis yang akan diupdate tidak ditemukan')
+          this.showToast('error', 'Jenis Tidak Ditemukan', 'Data jenis yang akan diupdate tidak ditemukan');
         } else {
-          const message = error.response?.data?.message || 'Terjadi kesalahan saat mengupdate jenis'
-          this.showToast('error', 'Gagal Update Jenis', message)
+          const message = error.response?.data?.message || 'Terjadi kesalahan saat mengupdate jenis';
+          this.showToast('error', 'Gagal Update Jenis', message);
         }
       } finally {
-        this.isSubmitting = false
+        this.isSubmitting = false;
       }
     },
 
-    // Show delete confirmation
+    // === Delete Confirmation ===
     hapus(id) {
-      this.deleteItemId = id
-      this.showConfirmDialog = true
+      this.deleteItemId = id;
+      this.showConfirmDialog = true;
     },
 
-    // Confirm delete
+    // === Confirm Delete ===
     async confirmDelete() {
-      const token = localStorage.getItem('token')
-      
       try {
-        const response = await axios.delete(`http://localhost:8000/api/jenis/${this.deleteItemId}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-
+        const response = await api.delete(`/jenis/${this.deleteItemId}`);
         if (response.data.success) {
-          this.showToast('success', 'Berhasil!', response.data.message)
-          this.getJenis()
+          this.showToast('success', 'Berhasil!', response.data.message);
+          this.getJenis();
         } else {
-          this.showToast('error', 'Gagal Hapus Jenis', response.data.message)
+          this.showToast('error', 'Gagal Hapus Jenis', response.data.message);
         }
       } catch (error) {
-        console.error('Error deleting jenis:', error)
-        
+        console.error('Error deleting jenis:', error);
         if (error.response?.status === 404) {
-          this.showToast('error', 'Jenis Tidak Ditemukan', 'Data jenis yang akan dihapus tidak ditemukan')
+          this.showToast('error', 'Jenis Tidak Ditemukan', 'Data jenis yang akan dihapus tidak ditemukan');
         } else if (error.response?.status === 400) {
-          // Jenis masih memiliki produk
-          const message = error.response.data.message || 'Tidak dapat menghapus jenis yang masih memiliki produk'
-          this.showToast('error', 'Gagal Hapus Jenis', message)
+          const message = error.response.data.message || 'Tidak dapat menghapus jenis yang masih memiliki produk';
+          this.showToast('error', 'Gagal Hapus Jenis', message);
         } else {
-          const message = error.response?.data?.message || 'Terjadi kesalahan saat menghapus jenis'
-          this.showToast('error', 'Gagal Hapus Jenis', message)
+          const message = error.response?.data?.message || 'Terjadi kesalahan saat menghapus jenis';
+          this.showToast('error', 'Gagal Hapus Jenis', message);
         }
       } finally {
-        this.cancelDelete()
+        this.cancelDelete();
       }
     },
 
-    // Cancel delete
+    // === Cancel Delete ===
     cancelDelete() {
-      this.showConfirmDialog = false
-      this.deleteItemId = null
+      this.showConfirmDialog = false;
+      this.deleteItemId = null;
     },
 
-    // Reset form
+    // === Reset & Close Form ===
     resetForm() {
-      this.form.id = null
-      this.form.name = ''
-      this.errors = {}
+      this.form.id = null;
+      this.form.name = '';
+      this.errors = {};
     },
 
-    // Close form
     closeForm() {
-      this.showForm = false
-      this.isEditMode = false
-      this.resetForm()
+      this.showForm = false;
+      this.isEditMode = false;
+      this.resetForm();
     }
-  },
-  
-  mounted() {
-    this.getJenis()
   }
-}
+};
 </script>
 
 <style scoped>

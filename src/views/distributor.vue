@@ -272,7 +272,8 @@
 </template>
 
 <script>
-import axios from 'axios'
+import api from '../../services/api'; 
+
 export default {
   name: 'Distributor',
   data() {
@@ -294,273 +295,199 @@ export default {
       toastId: 0,
       showConfirmDialog: false,
       deleteItemId: null
-    }
+    };
   },
-  
+
   mounted() {
-    this.fetchUserData()
-    this.getDistributors()
+    this.fetchUserData();
+    this.getDistributors();
   },
-  
+
   methods: {
+    // === Fetch User Data ===
     async fetchUserData() {
       try {
-        const token = localStorage.getItem('token')
-        if (!token) {
-          this.$router.push('/login')
-          return
-        }
-
-        const userRes = await axios.get('http://localhost:8000/api/user', {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-        
-        this.currentUser = userRes.data.data || { name: 'User', role: 'Guest' }
+        const response = await api.get('/user');
+        this.currentUser = response.data.data || { name: 'User', role: 'Guest' };
       } catch (error) {
-        console.error('Error fetching user data:', error)
-        if (error.response?.status === 401) {
-          localStorage.removeItem('token')
-          this.$router.push('/login')
-        }
+        console.error('Error fetching user data:', error);
+        localStorage.removeItem('token');
+        this.$router.push('/login');
       }
     },
 
-    // Toast Methods
+    // === Toast Methods ===
     showToast(type, title, message = null, duration = 4000) {
-      const id = ++this.toastId
-      const toast = {
-        id,
-        type,
-        title,
-        message
-      }
-
-      this.toasts.push(toast)
-
-      setTimeout(() => {
-        this.removeToast(id)
-      }, duration)
-
-      return id
+      const id = ++this.toastId;
+      this.toasts.push({ id, type, title, message });
+      setTimeout(() => this.removeToast(id), duration);
+      return id;
     },
 
     removeToast(id) {
-      const index = this.toasts.findIndex(toast => toast.id === id)
-      if (index > -1) {
-        this.toasts.splice(index, 1)
-      }
+      const index = this.toasts.findIndex(t => t.id === id);
+      if (index > -1) this.toasts.splice(index, 1);
     },
 
-    // Format Date
+    // === Format Date ===
     formatDate(dateString) {
-      if (!dateString) return '-'
-      const date = new Date(dateString)
+      if (!dateString) return '-';
+      const date = new Date(dateString);
       return date.toLocaleDateString('id-ID', {
         year: 'numeric',
         month: 'long',
         day: 'numeric'
-      })
+      });
     },
 
-    // Get All Distributors
+    // === Get All Distributors ===
     async getDistributors() {
-      const token = localStorage.getItem('token')
       try {
-        const response = await axios.get('http://localhost:8000/api/distributor', {
-          headers: { 
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        })
-        
+        const response = await api.get('/distributor');
         if (response.data.success) {
-          this.distributors = response.data.data
+          this.distributors = response.data.data;
         } else {
-          this.showToast('error', 'Gagal Memuat Data', response.data.message)
+          this.showToast('error', 'Gagal Memuat Data', response.data.message);
         }
       } catch (error) {
-        console.error('Error fetching distributors:', error)
-        this.showToast('error', 'Gagal Memuat Data', 'Terjadi kesalahan saat memuat data distributor')
+        console.error('Error fetching distributors:', error);
+        this.showToast('error', 'Gagal Memuat Data', 'Terjadi kesalahan saat memuat data distributor');
       }
     },
 
-    // Add Distributor
+    // === Add Distributor ===
     async addDistributor() {
-      const token = localStorage.getItem('token')
-      
       if (!this.form.name.trim()) {
-        this.showToast('error', 'Validasi Error', 'Nama distributor harus diisi!')
-        return
+        this.showToast('error', 'Validasi Error', 'Nama distributor harus diisi!');
+        return;
       }
-
       if (!this.form.phone.trim()) {
-        this.showToast('error', 'Validasi Error', 'Nomor telepon harus diisi!')
-        return
+        this.showToast('error', 'Validasi Error', 'Nomor telepon harus diisi!');
+        return;
       }
-
       if (!this.form.address.trim()) {
-        this.showToast('error', 'Validasi Error', 'Alamat harus diisi!')
-        return
+        this.showToast('error', 'Validasi Error', 'Alamat harus diisi!');
+        return;
       }
 
       const formData = {
         name: this.form.name.trim(),
         phone: this.form.phone.trim(),
         address: this.form.address.trim()
-      }
+      };
 
       try {
-        const response = await axios.post('http://localhost:8000/api/distributor', formData, {
-          headers: { 
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        })
-
+        const response = await api.post('/distributor', formData);
         if (response.data.success) {
-          this.resetForm()
-          this.closeForm()
-          this.getDistributors()
-          this.showToast('success', 'Berhasil!', response.data.message)
+          this.resetForm();
+          this.closeForm();
+          this.getDistributors();
+          this.showToast('success', 'Berhasil!', response.data.message);
         } else {
-          this.showToast('error', 'Gagal Menambah Distributor', response.data.message)
+          this.showToast('error', 'Gagal Menambah Distributor', response.data.message);
         }
       } catch (error) {
-        console.error('Error adding distributor:', error)
-        if (error.response?.data?.errors) {
-          const errors = error.response.data.errors
-          const errorMessage = Object.values(errors).flat().join(', ')
-          this.showToast('error', 'Gagal Menambah Distributor', errorMessage)
-        } else if (error.response?.data?.message) {
-          this.showToast('error', 'Gagal Menambah Distributor', error.response.data.message)
-        } else {
-          this.showToast('error', 'Gagal Menambah Distributor', 'Terjadi kesalahan saat menambahkan distributor')
-        }
+        console.error('Error adding distributor:', error);
+        const errorMessage = error.response?.data?.errors
+          ? Object.values(error.response.data.errors).flat().join(', ')
+          : error.response?.data?.message || 'Terjadi kesalahan saat menambahkan distributor';
+        this.showToast('error', 'Gagal Menambah Distributor', errorMessage);
       }
     },
 
-    // Edit Distributor (Open Form)
+    // === Edit Distributor ===
     editDistributor(item) {
-      this.form.id = item.id
-      this.form.name = item.name
-      this.form.phone = item.phone
-      this.form.address = item.address
-      this.isEditMode = true
-      this.showForm = true
+      this.form.id = item.id;
+      this.form.name = item.name;
+      this.form.phone = item.phone;
+      this.form.address = item.address;
+      this.isEditMode = true;
+      this.showForm = true;
     },
 
-    // Update Distributor
+    // === Update Distributor ===
     async updateDistributor() {
-      const token = localStorage.getItem('token')
-      
       if (!this.form.name.trim()) {
-        this.showToast('error', 'Validasi Error', 'Nama distributor harus diisi!')
-        return
+        this.showToast('error', 'Validasi Error', 'Nama distributor harus diisi!');
+        return;
       }
-
       if (!this.form.phone.trim()) {
-        this.showToast('error', 'Validasi Error', 'Nomor telepon harus diisi!')
-        return
+        this.showToast('error', 'Validasi Error', 'Nomor telepon harus diisi!');
+        return;
       }
-
       if (!this.form.address.trim()) {
-        this.showToast('error', 'Validasi Error', 'Alamat harus diisi!')
-        return
+        this.showToast('error', 'Validasi Error', 'Alamat harus diisi!');
+        return;
       }
 
       const formData = {
         name: this.form.name.trim(),
         phone: this.form.phone.trim(),
         address: this.form.address.trim()
-      }
+      };
 
       try {
-        const response = await axios.put(`http://localhost:8000/api/distributor/${this.form.id}`, formData, {
-          headers: { 
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        })
-
+        const response = await api.put(`/distributor/${this.form.id}`, formData);
         if (response.data.success) {
-          this.resetForm()
-          this.closeForm()
-          this.getDistributors()
-          this.showToast('success', 'Berhasil!', response.data.message)
+          this.resetForm();
+          this.closeForm();
+          this.getDistributors();
+          this.showToast('success', 'Berhasil!', response.data.message);
         } else {
-          this.showToast('error', 'Gagal Update Distributor', response.data.message)
+          this.showToast('error', 'Gagal Update Distributor', response.data.message);
         }
       } catch (error) {
-        console.error('Error updating distributor:', error)
-        if (error.response?.data?.errors) {
-          const errors = error.response.data.errors
-          const errorMessage = Object.values(errors).flat().join(', ')
-          this.showToast('error', 'Gagal Update Distributor', errorMessage)
-        } else if (error.response?.data?.message) {
-          this.showToast('error', 'Gagal Update Distributor', error.response.data.message)
-        } else {
-          this.showToast('error', 'Gagal Update Distributor', 'Terjadi kesalahan saat mengupdate distributor')
-        }
+        console.error('Error updating distributor:', error);
+        const errorMessage = error.response?.data?.errors
+          ? Object.values(error.response.data.errors).flat().join(', ')
+          : error.response?.data?.message || 'Terjadi kesalahan saat mengupdate distributor';
+        this.showToast('error', 'Gagal Update Distributor', errorMessage);
       }
     },
 
-    // Delete Distributor (Show Confirmation)
+    // === Delete Distributor ===
     hapus(id) {
-      this.deleteItemId = id
-      this.showConfirmDialog = true
+      this.deleteItemId = id;
+      this.showConfirmDialog = true;
     },
 
-    // Confirm Delete
     async confirmDelete() {
-      const token = localStorage.getItem('token')
       try {
-        const response = await axios.delete(`http://localhost:8000/api/distributor/${this.deleteItemId}`, {
-          headers: { 
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        })
-
+        const response = await api.delete(`/distributor/${this.deleteItemId}`);
         if (response.data.success) {
-          this.getDistributors()
-          this.showToast('success', 'Berhasil!', response.data.message)
+          this.getDistributors();
+          this.showToast('success', 'Berhasil!', response.data.message);
         } else {
-          this.showToast('error', 'Gagal Hapus Distributor', response.data.message)
+          this.showToast('error', 'Gagal Hapus Distributor', response.data.message);
         }
       } catch (error) {
-        console.error('Error deleting distributor:', error)
-        if (error.response?.data?.message) {
-          this.showToast('error', 'Gagal Hapus Distributor', error.response.data.message)
-        } else {
-          this.showToast('error', 'Gagal Hapus Distributor', 'Terjadi kesalahan saat menghapus distributor')
-        }
+        console.error('Error deleting distributor:', error);
+        const message = error.response?.data?.message || 'Terjadi kesalahan saat menghapus distributor';
+        this.showToast('error', 'Gagal Hapus Distributor', message);
       } finally {
-        this.cancelDelete()
+        this.cancelDelete();
       }
     },
 
-    // Cancel Delete
     cancelDelete() {
-      this.showConfirmDialog = false
-      this.deleteItemId = null
+      this.showConfirmDialog = false;
+      this.deleteItemId = null;
     },
 
-    // Reset Form
     resetForm() {
-      this.form.id = null
-      this.form.name = ''
-      this.form.phone = ''
-      this.form.address = ''
+      this.form.id = null;
+      this.form.name = '';
+      this.form.phone = '';
+      this.form.address = '';
     },
 
-    // Close Form
     closeForm() {
-      this.showForm = false
-      this.isEditMode = false
-      this.resetForm()
+      this.showForm = false;
+      this.isEditMode = false;
+      this.resetForm();
     }
   }
-}
+};
 </script>
 
 <style scoped>
