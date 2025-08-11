@@ -180,7 +180,7 @@
                     <p class="font-medium">{{ item.quantity }}</p>
                   </div>
                   <div class="flex justify-between sm:flex-col">
-                    <span class="text-gray-600">Harga:</span>
+                    <span class="text-gray-600">Harga Item:</span>
                     <p class="font-medium">Rp {{ formatCurrency(item.selling_price) }}</p>
                   </div>
                   <div class="flex justify-between sm:flex-col">
@@ -193,7 +193,7 @@
 
             <div class="border-t border-gray-200 pt-4 mb-4">
               <div class="flex justify-between items-center text-lg font-semibold mb-4">
-                <span>Subtotal:</span>
+                <span>Harga Total Pembelanjaan:</span>
                 <span>Rp {{ formatCurrency(subtotalAmount) }}</span>
               </div>
 
@@ -312,7 +312,7 @@
               </div>
               
               <div class="flex justify-between items-center text-xl font-bold mb-6 p-4 bg-gray-50 rounded-lg border-2 border-blue-200">
-                <span>Total Bayar:</span>
+                <span>Total Pembayaran:</span>
                 <div class="text-right">
                   <div v-if="appliedDiscount" class="text-sm font-normal text-gray-600 line-through">
                     Rp {{ formatCurrency(subtotalAmount) }}
@@ -387,7 +387,7 @@
                 </div>
                 
                 <div class="mt-3 sm:mt-4">
-                  <p class="text-xs text-gray-600 mb-2">Uang Pas:</p>
+                  <p class="text-xs text-gray-600 mb-2">Uang Tunai:</p>
                   <div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
                     <button
                       v-for="amount in quickCashAmounts"
@@ -1319,158 +1319,328 @@ export default {
       }
     }
     
-    const printReceiptWithData = () => {
-      const receiptData = {
-        transaction_code: lastTransactionCode.value,
-        total: lastTransactionTotal.value,
-        items: lastTransactionItems.value,
-        paymentMethod: paymentMethod.value,
-        cashReceived: lastTransactionCash.value,
-        changeAmount: lastTransactionChange.value,
-        discount: lastTransactionDiscount.value
-      }
-      
-      printReceiptFromData(receiptData)
-    }
-    
-    const printReceiptFromData = (data) => {
-      const user = JSON.parse(localStorage.getItem('user') || '{}')
-      
-      const cartItemsHtml = data.items.map(item => 
-        `<div style="margin-bottom: 5px;">
-          <div><strong>${item.name}</strong></div>
-          <div style="display: flex; justify-content: space-between;">
-            <span>${item.quantity} x Rp ${formatCurrency(item.selling_price)}</span>
-            <span>Rp ${formatCurrency(item.subtotal)}</span>
-          </div>
-        </div>`
-      ).join('')
-
-      const subtotalForReceipt = data.items.reduce((sum, item) => sum + item.subtotal, 0)
-      
-      let discountHtml = ''
-      if (data.discount && data.discount.amount > 0) {
-        discountHtml = `
-          <div style="border-top: 1px dashed #000; padding-top: 10px; margin-top: 10px;">
-            <div style="display: flex; justify-content: space-between;">
-              <span>Subtotal:</span>
-              <span>Rp ${formatCurrency(subtotalForReceipt)}</span>
-            </div>
-            <div style="display: flex; justify-content: space-between; color: #e74c3c;">
-              <span>Diskon ${data.discount.type === 'percentage' ? data.discount.value + '%' : 'Rp ' + formatCurrency(data.discount.value)}:</span>
-              <span>-Rp ${formatCurrency(data.discount.amount)}</span>
-            </div>
-          </div>
-        `
-      }
-
-      let paymentDetailsHtml = ''
-      
-      if (data.paymentMethod === 'tunai') {
-        const cashValue = parseFloat(data.cashReceived) || 0
-        const changeValue = parseFloat(data.changeAmount) || 0
-        
-        if (cashValue > 0) {
-          paymentDetailsHtml = `
-            <div style="border-top: 1px dashed #000; padding-top: 10px; margin-top: 10px;">
-              <p style="margin: 0; text-align: right;">Bayar: Rp ${formatCurrency(cashValue)}</p>
-              <p style="margin: 0; text-align: right; font-weight: bold;">Kembalian: ${changeValue > 0 ? 'Rp ' + formatCurrency(changeValue) : '-'}</p>
-            </div>
-          `
-        } else {
-          paymentDetailsHtml = `
-            <div style="border-top: 1px dashed #000; padding-top: 10px; margin-top: 10px;">
-              <p style="margin: 0; text-align: right;">Pembayaran: Tunai</p>
-              <p style="margin: 0; text-align: right; font-weight: bold;">Kembalian: -</p>
-            </div>
-          `
+        const printReceiptWithData = () => {
+          const receiptData = {
+            transaction_code: lastTransactionCode.value,
+            total: lastTransactionTotal.value,
+            items: lastTransactionItems.value,
+            paymentMethod: paymentMethod.value,
+            cashReceived: lastTransactionCash.value,
+            changeAmount: lastTransactionChange.value,
+            discount: lastTransactionDiscount.value
+          }
+          
+          printReceiptFromData(receiptData)
         }
-      } else if (data.paymentMethod === 'qris') {
-        paymentDetailsHtml = `
-          <div style="border-top: 1px dashed #000; padding-top: 10px; margin-top: 10px;">
-            <p style="margin: 0; text-align: right;">Pembayaran: QRIS</p>
-            <p style="margin: 0; text-align: right; font-size: 12px;">✓ Pembayaran Digital Berhasil</p>
-            <p style="margin: 0; text-align: right; font-weight: bold;">Kembalian: -</p>
-          </div>
-        `
-      }
+        
+const printReceiptFromData = (data) => {
+  const user = JSON.parse(localStorage.getItem('user') || '{}')
+  
+  // Import logo - pastikan path sesuai dengan struktur project Anda
+  const logoPath = '/src/assets/logo/logo_kurma_gray.png'
+  
+  const cartItemsHtml = data.items.map(item => 
+    `<div style="margin-bottom: 3px;">
+      <div style="font-weight: bold; font-size: 12px;">${item.name}</div>
+      <div style="display: flex; justify-content: space-between; font-size: 10px;">
+        <span>${item.quantity} x Rp ${formatCurrency(item.selling_price)}</span>
+        <span>Rp ${formatCurrency(item.subtotal)}</span>
+      </div>
+    </div>`
+  ).join('')
 
-      const currentTime = new Date()
-      const day = currentTime.getDate().toString().padStart(2, '0')
-      const month = (currentTime.getMonth() + 1).toString().padStart(2, '0')
-      const year = currentTime.getFullYear()
-      const hours = currentTime.getHours().toString().padStart(2, '0')
-      const minutes = currentTime.getMinutes().toString().padStart(2, '0')
-      
-      const receiptDate = `${day}/${month}/${year} ${hours}:${minutes}`
+  const subtotalForReceipt = data.items.reduce((sum, item) => sum + item.subtotal, 0)
+  
+  let discountHtml = ''
+  if (data.discount && data.discount.amount > 0) {
+    discountHtml = `
+      <div style="border-top: 1px dashed #000; padding-top: 5px; margin-top: 5px;">
+        <div style="display: flex; justify-content: space-between; font-size: 10px;">
+          <span>Subtotal:</span>
+          <span>Rp ${formatCurrency(subtotalForReceipt)}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 10px;">
+          <span>Diskon ${data.discount.type === 'percentage' ? data.discount.value + '%' : 'Rp ' + formatCurrency(data.discount.value)}:</span>
+          <span>-Rp ${formatCurrency(data.discount.amount)}</span>
+        </div>
+      </div>
+    `
+  }
 
-      const receiptContent = `
-        <div style="width: 300px; font-family: monospace; margin: 0 auto;">
-          <div style="text-align: center; border-bottom: 1px dashed #000; padding-bottom: 10px; margin-bottom: 10px;">
-            <h3 style="margin: 0;">GROSIR KURMA PONTIANAK</h3>
-            <p style="margin: 0; font-size: 12px;">Sistem Kasir Digital</p>
-            <p style="margin: 0; font-size: 12px;">Telp: 0812-2100-6766</p>
+  let paymentDetailsHtml = ''
+  
+  if (data.paymentMethod === 'tunai') {
+    if (data.cashReceived && data.cashReceived > 0) {
+      const changeAmount = data.changeAmount || 0
+      paymentDetailsHtml = `
+        <div style="border-top: 1px dashed #000; padding-top: 5px; margin-top: 5px;">
+          <div style="display: flex; justify-content: space-between; font-size: 10px;">
+            <span>Tunai:</span>
+            <span>Rp ${formatCurrency(data.cashReceived)}</span>
           </div>
-          
-          <div style="margin-bottom: 10px;">
-            <p style="margin: 0;"><strong>Kode Transaksi:</strong> ${data.transaction_code}</p>
-            <p style="margin: 0;"><strong>Tanggal:</strong> ${receiptDate}</p>
-            <p style="margin: 0;"><strong>Kasir:</strong> ${user.name || 'Kasir'}</p>
-            <p style="margin: 0;"><strong>Metode:</strong> ${data.paymentMethod.toUpperCase()}</p>
-          </div>
-          
-          <div style="border-bottom: 1px dashed #000; padding-bottom: 10px; margin-bottom: 10px;">
-            ${cartItemsHtml}
-          </div>
-          
-          ${discountHtml}
-          
-          <div style="text-align: right; font-size: 14px;">
-            <p style="margin: 0;"><strong>TOTAL: Rp ${formatCurrency(data.total)}</strong></p>
-            ${paymentDetailsHtml}
-          </div>
-          
-          <div style="text-align: center; margin-top: 20px; font-size: 12px;">
-            <p style="margin: 0;">Terima kasih atas kunjungan Anda!</p>
-            <p style="margin: 0;">Jangan Lupa Datang Kembali :)</p>
-            <p style="margin: 0; margin-top: 10px; font-size: 10px;">Powered by KIOS KURMA POS System</p>
+          <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 10px;">
+            <span>Kembalian:</span>
+            <span>${changeAmount > 0 ? 'Rp ' + formatCurrency(changeAmount) : '-'}</span>
           </div>
         </div>
       `
-      
-      const printWindow = window.open('', '_blank')
-      if (printWindow) {
-        printWindow.document.write(`
-          <html>
-            <head>
-              <title>Struk Belanja - ${data.transaction_code}</title>
-              <style>
-                body { margin: 0; padding: 20px; }
-                @media print {
-                  body { margin: 0; padding: 0; }
-                }
-              </style>
-            </head>
-            <body>
-              ${receiptContent}
-            </body>
-          </html>
-        `)
-        printWindow.document.close()
-        
-        setTimeout(async () => {
-          printWindow.print()
-          printWindow.close()
-          
-          try {
-            await initializeTransactionCode()
-            console.log('[KASIR] Ready for next transaction after print')
-          } catch (error) {
-            console.error('[KASIR] Failed to refresh transaction code after print:', error)
-          }
-        }, 250)
-      }
+    } else {
+      paymentDetailsHtml = `
+        <div style="border-top: 1px dashed #000; padding-top: 5px; margin-top: 5px;">
+          <div style="display: flex; justify-content: space-between; font-size: 10px;">
+            <span>Pembayaran:</span>
+            <span>Tunai</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 10px;">
+            <span>Kembalian:</span>
+            <span>-</span>
+          </div>
+        </div>
+      `
     }
+  } else if (data.paymentMethod === 'qris') {
+    paymentDetailsHtml = `
+      <div style="border-top: 1px dashed #000; padding-top: 5px; margin-top: 5px;">
+        <div style="display: flex; justify-content: space-between; font-size: 10px;">
+          <span>Pembayaran:</span>
+          <span>QRIS</span>
+        </div>
+        <div style="text-align: center; font-size: 9px; margin: 3px 0;">
+          ✓ Pembayaran Digital Berhasil
+        </div>
+        <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 10px;">
+          <span>Kembalian:</span>
+          <span>-</span>
+        </div>
+      </div>
+    `
+  }
+
+  const currentTime = new Date()
+  const day = currentTime.getDate().toString().padStart(2, '0')
+  const month = (currentTime.getMonth() + 1).toString().padStart(2, '0')
+  const year = currentTime.getFullYear()
+  const hours = currentTime.getHours().toString().padStart(2, '0')
+  const minutes = currentTime.getMinutes().toString().padStart(2, '0')
+  
+  const receiptDate = `${day}/${month}/${year} ${hours}:${minutes}`
+
+  const receiptContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <title>Struk - ${data.transaction_code}</title>
+      <style>
+        * {
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+        }
+        
+        body {
+          font-family: 'Consolas', monospace;
+          font-size: 12px;
+          line-height: 1.4;
+          font-weight: bold;
+          width: 80mm;
+          margin: 0;
+          padding: 0;
+          color: #000;
+        }
+        
+        .receipt-container {
+          width: 100%;
+          max-width: 58mm;
+          padding: 0; 
+        }
+        
+        .header {
+          text-align: center;
+          margin-bottom: 8px;
+          border-bottom: 1px dashed #000;
+          padding-bottom: 5px;
+        }
+        
+        .logo {
+          width: 100px;
+          height: 100px;
+          margin: 5px auto 10px auto;
+          display: block;
+          /* Filter khusus untuk perjelas detail pohon/buah tanpa gelapkan tulisan */
+          filter: 
+            contrast(2.5)         /* Kontras sedang untuk perjelas abu-abu */
+            brightness(0.6)       /* Sedikit gelap untuk solidkan detail */
+            saturate(0);          /* Hilangkan warna */
+          
+          /* Rendering tajam */
+          image-rendering: -webkit-optimize-contrast;
+          image-rendering: -moz-crisp-edges;
+          image-rendering: crisp-edges;
+          image-rendering: pixelated;
+          
+          /* Print optimization */
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+        
+        .header h3 {
+          font-size: 12px;
+          font-weight: bold;
+          margin-bottom: 2px;
+          line-height: 1.1;
+        }
+        
+        .header p {
+          font-size: 9px;
+          margin: 1px 0;
+        }
+        
+        .transaction-info {
+          margin-bottom: 8px;
+          font-size: 10px;
+          border-bottom: 1px dashed #000;
+          padding-bottom: 5px;
+        }
+        
+        .transaction-info p {
+          margin: 1px 0;
+          display: flex;
+          justify-content: flex-start;
+          align-items: center;
+        }
+        
+        .transaction-info .label {
+          width: 60px;
+          display: inline-block;
+          margin-right: 5px;
+        }
+        
+        .transaction-info .value {
+          flex: 1;
+        }
+        
+        .items-section {
+          border-bottom: 1px dashed #000;
+          padding-bottom: 5px;
+          margin-bottom: 5px;
+        }
+        
+        .total-section {
+          text-align: right;
+          font-size: 11px;
+          margin-top: 5px;
+        }
+        
+        .total-section p {
+          margin: 2px 0;
+        }
+        
+        .grand-total {
+          font-weight: bold;
+          font-size: 12px;
+        }
+        
+        .footer {
+          text-align: center;
+          margin-top: 10px;
+          font-size: 9px;
+          border-top: 1px dashed #000;
+          padding-top: 5px;
+        }
+        
+        .footer p {
+          margin: 1px 0;
+        }
+        
+        @page {
+          size: 80mm auto;
+          margin: 0;
+        }
+        
+        @media print {
+          body {
+            width: 58mm;
+            margin: 0;
+            padding: 0mm;
+          }
+          
+          .receipt-container {
+            width: 80mm;
+          }
+          
+          * {
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          
+          .logo {
+            /* Filter print untuk perjelas detail pohon/buah */
+            filter: 
+              contrast(3.5)         /* Kontras lebih tinggi saat print */
+              brightness(0.5)       /* Sedikit lebih gelap untuk detail */
+              saturate(0);          /* Hilangkan warna */
+            
+            /* Rendering setting */
+            image-rendering: pixelated !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="receipt-container">
+        <div class="header">
+          <!-- Logo sama seperti printReceipt -->
+          <img src="${logoPath}" alt="Logo Grosir Kurma Pontianak" class="logo" onerror="console.log('Logo gagal dimuat'); this.style.display='none';">
+          <!-- Hilangkan text title karena sudah ada di logo -->
+          <p>Jl. Mitra Perdana No.5, Parit Tokaya</p>
+          <p>Kec. Pontianak Sel., Kota Pontianak</p>
+          <p>Kalimantan Barat 78115</p>
+          <p>Telp: 0812-2100-6766</p>
+        </div>
+        
+        <div class="transaction-info">
+          <p><span class="label">Kode</span><span class="value">: ${data.transaction_code}</span></p>
+          <p><span class="label">Tanggal</span><span class="value">: ${receiptDate}</span></p>
+          <p><span class="label">Kasir</span><span class="value">: ${user.name || 'Kasir'}</span></p>
+          <p><span class="label">Metode</span><span class="value">: ${data.paymentMethod.toUpperCase()}</span></p>
+        </div>
+        
+        <div class="items-section">
+          ${cartItemsHtml}
+        </div>
+        
+        ${discountHtml}
+        
+        <div class="total-section">
+          <p class="grand-total">TOTAL: Rp ${formatCurrency(data.total)}</p>
+          ${paymentDetailsHtml}
+        </div>
+        
+        <div class="footer">
+          <p>Terima kasih atas kunjungan Anda!</p>
+          <p>Jangan Lupa Datang Kembali :)</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `
+  
+  const printWindow = window.open('', '_blank', 'width=220,height=600')
+  if (printWindow) {
+    printWindow.document.write(receiptContent)
+    printWindow.document.close()
+    
+    printWindow.onload = function() {
+      setTimeout(() => {
+        printWindow.print()
+        printWindow.close()
+      }, 500)
+    }
+  }
+}
     
     const showToastNotification = (message, type = 'success') => {
       toastMessage.value = message

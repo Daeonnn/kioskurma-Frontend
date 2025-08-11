@@ -562,6 +562,7 @@ export default {
 
     onMounted(() => {
       document.addEventListener('click', handleClickOutside)
+      fetchReportData()
     })
 
     onUnmounted(() => {
@@ -818,129 +819,308 @@ export default {
       selectedTransaction.value = null
     }
 
-    const printReceipt = (transaction) => {
-      const user = JSON.parse(localStorage.getItem('user') || '{}')
-      
-      const cartItemsHtml = transaction.details.map(detail => 
-        `<div style="margin-bottom: 5px;">
-          <div><strong>${detail.product.name}</strong></div>
-          <div style="display: flex; justify-content: space-between;">
-            <span>${detail.quantity} x Rp ${formatCurrency(detail.selling_price)}</span>
-            <span>Rp ${formatCurrency(detail.subtotal)}</span>
-          </div>
-        </div>`
-      ).join('')
+const printReceipt = (transaction) => {
+  const user = JSON.parse(localStorage.getItem('user') || '{}')
+  
+  // Import logo - pastikan path sesuai dengan struktur project Anda
+  const logoPath = '/src/assets/logo/logo_kurma_gray.png'
+  
+  const cartItemsHtml = transaction.details.map(detail => 
+    `<div style="margin-bottom: 3px;">
+      <div style="font-weight: bold; font-size: 12px;">${detail.product.name}</div>
+      <div style="display: flex; justify-content: space-between; font-size: 10px;">
+        <span>${detail.quantity} x Rp ${formatCurrency(detail.selling_price)}</span>
+        <span>Rp ${formatCurrency(detail.subtotal)}</span>
+      </div>
+    </div>`
+  ).join('')
 
-      const subtotalForReceipt = getSubtotalAmount(transaction)
-      
-      let discountHtml = ''
-      if (hasDiscount(transaction)) {
-        discountHtml = `
-          <div style="border-top: 1px dashed #000; padding-top: 10px; margin-top: 10px;">
-            <div style="display: flex; justify-content: space-between;">
-              <span>Subtotal:</span>
-              <span>Rp ${formatCurrency(subtotalForReceipt)}</span>
-            </div>
-            <div style="display: flex; justify-content: space-between; color: #e74c3c;">
-              <span>Diskon ${formatDiscountDisplay(transaction)}:</span>
-              <span>-Rp ${formatCurrency(transaction.discount_amount)}</span>
-            </div>
-          </div>
-        `
-      }
+  const subtotalForReceipt = getSubtotalAmount(transaction)
+  
+  let discountHtml = ''
+  if (hasDiscount(transaction)) {
+    discountHtml = `
+      <div style="border-top: 1px dashed #000; padding-top: 5px; margin-top: 5px;">
+        <div style="display: flex; justify-content: space-between; font-size: 10px;">
+          <span>Subtotal:</span>
+          <span>Rp ${formatCurrency(subtotalForReceipt)}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 10px;">
+          <span>Diskon ${formatDiscountDisplay(transaction)}:</span>
+          <span>-Rp ${formatCurrency(transaction.discount_amount)}</span>
+        </div>
+      </div>
+    `
+  }
 
-      let paymentDetailsHtml = ''
-      const paymentMethod = transaction.payment_method || 'tunai'
-      
-      if (paymentMethod === 'tunai') {
-        if (transaction.cash_received && transaction.cash_received > 0) {
-          const changeAmount = transaction.change_amount || 0
-          paymentDetailsHtml = `
-            <div style="border-top: 1px dashed #000; padding-top: 10px; margin-top: 10px;">
-              <p style="margin: 0; text-align: right;">Bayar: Rp ${formatCurrency(transaction.cash_received)}</p>
-              <p style="margin: 0; text-align: right; font-weight: bold;">Kembalian: ${changeAmount > 0 ? 'Rp ' + formatCurrency(changeAmount) : '-'}</p>
-            </div>
-          `
-        } else {
-          paymentDetailsHtml = `
-            <div style="border-top: 1px dashed #000; padding-top: 10px; margin-top: 10px;">
-              <p style="margin: 0; text-align: right;">Pembayaran: Tunai</p>
-              <p style="margin: 0; text-align: right; font-weight: bold;">Kembalian: -</p>
-            </div>
-          `
-        }
-      } else if (paymentMethod === 'qris') {
-        paymentDetailsHtml = `
-          <div style="border-top: 1px dashed #000; padding-top: 10px; margin-top: 10px;">
-            <p style="margin: 0; text-align: right;">Pembayaran: QRIS</p>
-            <p style="margin: 0; text-align: right; font-size: 12px;">✓ Pembayaran Digital Berhasil</p>
-            <p style="margin: 0; text-align: right; font-weight: bold;">Kembalian: -</p>
+  let paymentDetailsHtml = ''
+  const paymentMethod = transaction.payment_method || 'tunai'
+  
+  if (paymentMethod === 'tunai') {
+    if (transaction.cash_received && transaction.cash_received > 0) {
+      const changeAmount = transaction.change_amount || 0
+      paymentDetailsHtml = `
+        <div style="border-top: 1px dashed #000; padding-top: 5px; margin-top: 5px;">
+          <div style="display: flex; justify-content: space-between; font-size: 10px;">
+            <span>Tunai:</span>
+            <span>Rp ${formatCurrency(transaction.cash_received)}</span>
           </div>
-        `
-      }
-
-      const transactionDate = utils.formatDateReceipt(transaction.date)
-
-      const receiptContent = `
-        <div style="width: 300px; font-family: monospace; margin: 0 auto;">
-          <div style="text-align: center; border-bottom: 1px dashed #000; padding-bottom: 10px; margin-bottom: 10px;">
-            <h3 style="margin: 0;">GROSIR KURMA PONTIANAK</h3>
-            <p style="margin: 0; font-size: 12px;">Sistem Kasir Digital</p>
-            <p style="margin: 0; font-size: 12px;">Telp: 0812-2100-6766</p>
-          </div>
-          
-          <div style="margin-bottom: 10px;">
-            <p style="margin: 0;"><strong>Kode Transaksi:</strong> ${transaction.transaction_code}</p>
-            <p style="margin: 0;"><strong>Tanggal:</strong> ${transactionDate}</p>
-            <p style="margin: 0;"><strong>Kasir:</strong> ${transaction.user?.name || 'Kasir'}</p>
-            <p style="margin: 0;"><strong>Metode:</strong> ${paymentMethod.toUpperCase()}</p>
-          </div>
-          
-          <div style="border-bottom: 1px dashed #000; padding-bottom: 10px; margin-bottom: 10px;">
-            ${cartItemsHtml}
-          </div>
-          
-          ${discountHtml}
-          
-          <div style="text-align: right; font-size: 14px;">
-            <p style="margin: 0;"><strong>TOTAL: Rp ${formatCurrency(transaction.total_price)}</strong></p>
-            ${paymentDetailsHtml}
-          </div>
-          
-          <div style="text-align: center; margin-top: 20px; font-size: 12px;">
-            <p style="margin: 0;">Terima kasih atas kunjungan Anda!</p>
-            <p style="margin: 0;">Jangan Lupa Datang Kembali :)</p>
-            <p style="margin: 0; margin-top: 10px; font-size: 10px;">Powered by KIOS KURMA POS System</p>
+          <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 10px;">
+            <span>Kembalian:</span>
+            <span>${changeAmount > 0 ? 'Rp ' + formatCurrency(changeAmount) : '-'}</span>
           </div>
         </div>
       `
-      
-      const printWindow = window.open('', '_blank')
-      if (printWindow) {
-        printWindow.document.write(`
-          <html>
-            <head>
-              <title>Struk Belanja - ${transaction.transaction_code}</title>
-              <style>
-                body { margin: 0; padding: 20px; }
-                @media print {
-                  body { margin: 0; padding: 0; }
-                }
-              </style>
-            </head>
-            <body>
-              ${receiptContent}
-            </body>
-          </html>
-        `)
-        printWindow.document.close()
-        
-        setTimeout(() => {
-          printWindow.print()
-          printWindow.close()
-        }, 250)
-      }
+    } else {
+      paymentDetailsHtml = `
+        <div style="border-top: 1px dashed #000; padding-top: 5px; margin-top: 5px;">
+          <div style="display: flex; justify-content: space-between; font-size: 10px;">
+            <span>Pembayaran:</span>
+            <span>Tunai</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 10px;">
+            <span>Kembalian:</span>
+            <span>-</span>
+          </div>
+        </div>
+      `
     }
+  } else if (paymentMethod === 'qris') {
+    paymentDetailsHtml = `
+      <div style="border-top: 1px dashed #000; padding-top: 5px; margin-top: 5px;">
+        <div style="display: flex; justify-content: space-between; font-size: 10px;">
+          <span>Pembayaran:</span>
+          <span>QRIS</span>
+        </div>
+        <div style="text-align: center; font-size: 9px; margin: 3px 0;">
+          ✓ Pembayaran Digital Berhasil
+        </div>
+        <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 10px;">
+          <span>Kembalian:</span>
+          <span>-</span>
+        </div>
+      </div>
+    `
+  }
+
+  const transactionDate = formatDate(transaction.date)
+
+  const receiptContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <title>Struk - ${transaction.transaction_code}</title>
+      <style>
+        * {
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+        }
+        
+        body {
+          font-family: 'Consolas', monospace;
+          font-size: 12px;
+          line-height: 1.4;
+          font-weight: bold;
+          width: 80mm;
+          margin: 0;
+          padding: 0;
+          color: #000;
+        }
+        
+        .receipt-container {
+          width: 100%;
+          max-width: 58mm;
+          padding: 0; 
+        }
+        
+        .header {
+          text-align: center;
+          margin-bottom: 8px;
+          border-bottom: 1px dashed #000;
+          padding-bottom: 5px;
+        }
+        
+        .logo {
+          width: 100px;
+          height: 100px;
+          margin: 5px auto 10px auto;
+          display: block;
+          /* Filter khusus untuk perjelas detail pohon/buah tanpa gelapkan tulisan */
+          filter: 
+            contrast(2.5)         /* Kontras sedang untuk perjelas abu-abu */
+            brightness(0.6)       /* Sedikit gelap untuk solidkan detail */
+            saturate(0);          /* Hilangkan warna */
+          
+          /* Rendering tajam */
+          image-rendering: -webkit-optimize-contrast;
+          image-rendering: -moz-crisp-edges;
+          image-rendering: crisp-edges;
+          image-rendering: pixelated;
+          
+          /* Print optimization */
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+        
+        .header h3 {
+          font-size: 12px;
+          font-weight: bold;
+          margin-bottom: 2px;
+          line-height: 1.1;
+        }
+        
+        .header p {
+          font-size: 9px;
+          margin: 1px 0;
+        }
+        
+        .transaction-info {
+          margin-bottom: 8px;
+          font-size: 10px;
+          border-bottom: 1px dashed #000;
+          padding-bottom: 5px;
+        }
+        
+        .transaction-info p {
+          margin: 1px 0;
+          display: flex;
+          justify-content: flex-start;
+          align-items: center;
+        }
+        
+        .transaction-info .label {
+          width: 60px;
+          display: inline-block;
+          margin-right: 5px;
+        }
+        
+        .transaction-info .value {
+          flex: 1;
+        }
+        
+        .items-section {
+          border-bottom: 1px dashed #000;
+          padding-bottom: 5px;
+          margin-bottom: 5px;
+        }
+        
+        .total-section {
+          text-align: right;
+          font-size: 11px;
+          margin-top: 5px;
+        }
+        
+        .total-section p {
+          margin: 2px 0;
+        }
+        
+        .grand-total {
+          font-weight: bold;
+          font-size: 12px;
+        }
+        
+        .footer {
+          text-align: center;
+          margin-top: 10px;
+          font-size: 9px;
+          border-top: 1px dashed #000;
+          padding-top: 5px;
+        }
+        
+        .footer p {
+          margin: 1px 0;
+        }
+        
+        @page {
+          size: 80mm auto;
+          margin: 0;
+        }
+        
+        @media print {
+          body {
+            width: 58mm;
+            margin: 0;
+            padding: 0mm;
+          }
+          
+          .receipt-container {
+            width: 80mm;
+          }
+          
+          * {
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          
+          .logo {
+            /* Filter print untuk perjelas detail pohon/buah */
+            filter: 
+              contrast(3.5)         /* Kontras lebih tinggi saat print */
+              brightness(0.5)       /* Sedikit lebih gelap untuk detail */
+              saturate(0);          /* Hilangkan warna */
+            
+            /* Rendering setting */
+            image-rendering: pixelated !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="receipt-container">
+        <div class="header">
+          <!-- Logo sama seperti printReceiptFromData -->
+          <img src="${logoPath}" alt="Logo Grosir Kurma Pontianak" class="logo" onerror="console.log('Logo gagal dimuat'); this.style.display='none';">
+          <!-- Hilangkan text title karena sudah ada di logo -->
+          <p>Jl. Mitra Perdana No.5, Parit Tokaya</p>
+          <p>Kec. Pontianak Sel., Kota Pontianak</p>
+          <p>Kalimantan Barat 78115</p>
+          <p>Telp: 0812-2100-6766</p>
+        </div>
+        
+        <div class="transaction-info">
+          <p><span class="label">Kode</span><span class="value">: ${transaction.transaction_code}</span></p>
+          <p><span class="label">Tanggal</span><span class="value">: ${transactionDate}</span></p>
+          <p><span class="label">Kasir</span><span class="value">: ${transaction.user?.name || 'Kasir'}</span></p>
+          <p><span class="label">Metode</span><span class="value">: ${paymentMethod.toUpperCase()}</span></p>
+        </div>
+        
+        <div class="items-section">
+          ${cartItemsHtml}
+        </div>
+        
+        ${discountHtml}
+        
+        <div class="total-section">
+          <p class="grand-total">TOTAL: Rp ${formatCurrency(transaction.total_price)}</p>
+          ${paymentDetailsHtml}
+        </div>
+        
+        <div class="footer">
+          <p>Terima kasih atas kunjungan Anda!</p>
+          <p>Jangan Lupa Datang Kembali :)</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `
+  
+  const printWindow = window.open('', '_blank', 'width=220,height=600')
+  if (printWindow) {
+    printWindow.document.write(receiptContent)
+    printWindow.document.close()
+    
+    printWindow.onload = function() {
+      setTimeout(() => {
+        printWindow.print()
+        printWindow.close()
+      }, 500)
+    }
+  }
+}
 
     const printReport = (format = 'compact') => {
       const user = JSON.parse(localStorage.getItem('user') || '{}')
@@ -1389,10 +1569,6 @@ export default {
         showToast.value = false
       }, 3000)
     }
-
-    onMounted(() => {
-      fetchReportData()
-    })
 
     return {
       reportData,
