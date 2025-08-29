@@ -634,27 +634,27 @@ export const transactionService = {
         }
       }
 
-      // ✅ DEBUG: Validate items structure
-      console.log('🔍 Validating items structure:')
-      saleData.items.forEach((item, index) => {
-        console.log(`Item ${index + 1}:`, {
-          product_id: item.product_id,
-          quantity: item.quantity,
-          price: item.price,
-          subtotal: item.subtotal,
-          has_required_fields: !!(item.product_id && item.quantity && item.price)
+              // ✅ DEBUG: Validate items structure
+        console.log('🔍 Validating items structure:')
+        saleData.items.forEach((item, index) => {
+          console.log(`Item ${index + 1}:`, {
+            product_id: item.product_id,
+            quantity: item.quantity,
+            selling_price: item.selling_price,
+            subtotal: item.subtotal,
+            has_required_fields: !!(item.product_id && item.quantity && item.selling_price)
+          })
+          // Validasi field required untuk items
+          if (!item.product_id) {
+            throw new Error(`Item ${index + 1}: product_id is required`)
+          }
+          if (!item.quantity || item.quantity <= 0) {
+            throw new Error(`Item ${index + 1}: quantity harus lebih dari 0`)
+          }
+          if (!item.selling_price || item.selling_price <= 0) {
+            throw new Error(`Item ${index + 1}: selling_price harus lebih dari 0`)
+          }
         })
-        // Validasi field required untuk items
-        if (!item.product_id) {
-          throw new Error(`Item ${index + 1}: product_id is required`)
-        }
-        if (!item.quantity || item.quantity <= 0) {
-          throw new Error(`Item ${index + 1}: quantity harus lebih dari 0`)
-        }
-        if (!item.price || item.price <= 0) {
-          throw new Error(`Item ${index + 1}: price harus lebih dari 0`)
-        }
-      })
 
       // ✅ KIRIM DATA ke backend
       console.log('📤 Sending data to backend with new format:', JSON.stringify(saleData, null, 2))
@@ -1116,6 +1116,7 @@ export const kasirComponentMethods = {
       const saleData = {
         transaction_code: transactionCode,
         transaction_sequence: transactionSequence,
+        user_id: window.transactionForm?.value?.user_id || null,
         date: currentDateForBackend,
         payment_method: paymentMethod,
         cash_received: cashReceivedValue,
