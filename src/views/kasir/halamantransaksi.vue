@@ -8,9 +8,8 @@
         </div>
         <div class="p-4 sm:p-6">
           <form @submit.prevent="addToCart">
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4">
-              <div @click="hideContextMenu">
-                <label class="block text-sm font-medium text-gray-700 mb-2">Kode Transaksi</label>
+            <div class="mb-4" @click="hideContextMenu">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Kode Transaksi (Format: TRYYMMDD000001)</label>
                 <div class="relative">
                   <input 
                     v-model="transactionForm.transaction_code"
@@ -18,11 +17,19 @@
                     type="text" 
                     class="w-full px-3 py-2 text-sm sm:text-base border border-gray-300 rounded-md bg-red-50 text-red-600 font-medium cursor-pointer"
                     readonly
-                    title="Klik kanan untuk refresh kode transaksi"
+                    title="Format: TR + YY + MM + DD + 000001 (Reset harian per user). Klik kanan untuk refresh."
                   >
                   <div v-if="loadingTransactionCode" class="absolute right-2 top-2">
                     <div class="animate-spin h-4 w-4 border-2 border-red-500 border-t-transparent rounded-full"></div>
                   </div>
+                </div>
+                
+                <!-- Info format kode transaksi -->
+                <div class="mt-1 text-xs text-gray-500">
+                  <span v-if="transactionForm.transaction_code && transactionService.parseTransactionCode">
+                    Format: TRYYMMDD000001 (Reset harian per user) | Seq: {{ transactionForm.transaction_sequence || 1 }}
+                  </span>
+                  <span v-else>Format: TRYYMMDD000001 (Reset harian per user)</span>
                 </div>
                 
                 <div v-if="showContextMenu" 
@@ -33,16 +40,6 @@
                     🔄 Refresh Kode
                   </button>
                 </div>
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Kode Antrian</label>
-                <input 
-                  v-model="currentQueueCode"
-                  type="text" 
-                  class="w-full px-3 py-2 text-sm sm:text-base border border-gray-300 rounded-md bg-blue-50 text-blue-600 font-medium"
-                  readonly
-                >
-              </div>
             </div>
 
             <div class="mb-4">
@@ -651,8 +648,11 @@ export default {
     
     const products = ref([])
     
+    // ✅ UPDATED: transactionForm dengan format TRYYMMDD000001
     const transactionForm = ref({
-      transaction_code: '',
+      transaction_code: '', // Format: TRYYMMDD000001
+      transaction_sequence: 1, // Reset harian per user
+      user_id: null, // ID user untuk reset sequence
       product_code: '',
       quantity: null,
       subtotal: 0
@@ -878,27 +878,61 @@ export default {
       
       try {
         loadingTransactionCode.value = true
-        console.log(`[KASIR] Getting transaction code (attempt ${retryCount + 1}/${maxRetries + 1})...`)
+        console.log(`[KASIR] Getting transaction code with format TRYYMMDD000001 (attempt ${retryCount + 1}/${maxRetries + 1})...`)
         
         const response = await transactionService.getNextTransactionCode()
         
         if (response.success && response.data.next_code) {
-          const transactionCode = response.data.next_code
-          console.log('[KASIR] Transaction code received:', transactionCode)
-          return transactionCode
+          const { next_code, next_sequence, user_id } = response.data
+          console.log('[KASIR] Transaction code received with new format:', { 
+            code: next_code, 
+            sequence: next_sequence, 
+            user_id: user_id,
+            format_valid: transactionService.validateTransactionCodeFormat ? transactionService.validateTransactionCodeFormat(next_code) : true
+          })
+          
+          // ✅ VALIDASI format kode transaksi
+          if (transactionService.validateTransactionCodeFormat && !transactionService.validateTransactionCodeFormat(next_code)) {
+            console.warn('[KASIR] Invalid transaction code format received:', next_code)
+          }
+          
+          // ✅ UPDATED: Set kode transaksi dengan format TRYYMMDD000001
+          transactionForm.value.transaction_code = next_code
+          transactionForm.value.transaction_sequence = next_sequence
+          transactionForm.value.user_id = user_id
+        
+          return { code: next_code, sequence: next_sequence, user_id }
         } else {
           throw new Error('Server response invalid: ' + JSON.stringify(response))
         }
       } catch (error) {
         console.error('[KASIR] Error getting transaction code:', error)
-        
+
         if (retryCount < maxRetries) {
           console.log('[KASIR] Retrying in 1 second...')
           await new Promise(resolve => setTimeout(resolve, 1000))
           return getTransactionCodeFromServer(retryCount + 1)
         } else {
           console.error('[KASIR] Max retries reached, using fallback')
-          return 'TR001'
+          
+          // ✅ UPDATED: Fallback dengan format TRYYMMDD000001
+          const now = new Date()
+          const year = now.getFullYear().toString().slice(-2) // 2 digit terakhir tahun
+          const month = String(now.getMonth() + 1).padStart(2, '0') // 2 digit bulan
+          const day = String(now.getDate()).padStart(2, '0') // 2 digit hari
+          const sequence = '000001' // Default sequence untuk fallback
+          
+          const fallbackCode = `TR${year}${month}${day}${sequence}`
+          const fallbackSequence = 1
+          
+          console.log('[KASIR] Using fallback code with new format:', fallbackCode, 'sequence:', fallbackSequence)
+          
+          // Set fallback values
+          transactionForm.value.transaction_code = fallbackCode
+          transactionForm.value.transaction_sequence = fallbackSequence
+          transactionForm.value.user_id = null
+          
+          return { code: fallbackCode, sequence: fallbackSequence, user_id: null }
         }
       } finally {
         loadingTransactionCode.value = false
@@ -909,13 +943,18 @@ export default {
       const maxRetries = 3
       
       try {
-        console.log(`[KASIR] Initializing transaction code (attempt ${retryCount + 1}/${maxRetries + 1})...`)
-        const transactionCode = await getTransactionCodeFromServer()
-        transactionForm.value.transaction_code = transactionCode
-        console.log('[KASIR] Transaction code initialized:', transactionCode)
-        return transactionCode
+        console.log(`[KASIR] Initializing transaction code with format TRYYMMDD000001 (attempt ${retryCount + 1}/${maxRetries + 1})...`)
+        const result = await getTransactionCodeFromServer()
+        
+        console.log('[KASIR] Transaction code initialized with new format:', {
+          code: result.code,
+          sequence: result.sequence,
+          user_id: result.user_id,
+          format_valid: transactionService.validateTransactionCodeFormat ? transactionService.validateTransactionCodeFormat(result.code) : true
+        })
+        return result
       } catch (error) {
-        console.error(`[KASIR] Error initializing transaction code (attempt ${retryCount + 1}):`, error)
+        console.error(`[KASIR] Error initializing transaction code with new format (attempt ${retryCount + 1}):`, error)
         
         if (retryCount < maxRetries) {
           console.log('[KASIR] Retrying in 1 second...')
@@ -923,9 +962,8 @@ export default {
           return initializeTransactionCode(retryCount + 1)
         } else {
           console.error('[KASIR] Max retries reached, using fallback')
-          transactionForm.value.transaction_code = 'TR001'
           showToastNotification('Gagal mendapatkan kode transaksi dari server. Menggunakan fallback.', 'error')
-          return 'TR001'
+          return { code: transactionForm.value.transaction_code, sequence: transactionForm.value.transaction_sequence, user_id: null }
         }
       }
     }
@@ -1651,10 +1689,15 @@ const printReceiptFromData = (data) => {
       }, 3000)
     }
     
+    // ✅ UPDATED: onMounted dengan format TRYYMMDD000001
     onMounted(async () => {
-      console.log('[KASIR] Component mounted')
+      console.log('[KASIR] Component mounted with format TRYYMMDD000001')
       
+      // ✅ INITIALIZE transaction code dengan format baru
       await initializeTransactionCode()
+      
+      // ✅ SET window reference
+      window.transactionForm = transactionForm
       
       const handleGlobalClick = () => {
         if (showContextMenu.value) {
@@ -1667,6 +1710,8 @@ const printReceiptFromData = (data) => {
       onUnmounted(() => {
         document.removeEventListener('click', handleGlobalClick)
       })
+      
+      console.log('[KASIR] Transaction system with format TRYYMMDD000001 ready')
     })
     
     return {
