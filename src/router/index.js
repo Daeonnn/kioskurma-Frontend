@@ -8,6 +8,7 @@ import Product from '../views/product.vue'
 import Satuan from '../views/satuan.vue'
 import Laporan from '../views/laporan.vue'
 import KelolaPegawai from '../views/kelolapegawai.vue'
+import AdminTransaksi from '../views/transaksi.vue'
 import KasirLayout from '../layout/KasirLayout.vue'
 import KasirDashboard from '../views/kasir/dashboard.vue'
 import KasirTransaksi from '../views/kasir/halamantransaksi.vue'
@@ -31,6 +32,7 @@ const routes = [
       { path: 'satuan', name: 'Satuan', component: Satuan },
       { path: 'product', name: 'Product', component: Product },
       { path: 'employee', name: 'KelolaPegawai', component: KelolaPegawai },
+      { path: 'transaksi', name: 'AdminTransaksi', component: AdminTransaksi },
       { path: 'laporan', name: 'Laporan', component: Laporan },
     ]
   },

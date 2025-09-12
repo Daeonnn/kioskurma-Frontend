@@ -395,7 +395,7 @@ export default {
         if (error.response?.status === 404) {
           this.showToast('error', 'Jenis Tidak Ditemukan', 'Data jenis yang akan dihapus tidak ditemukan');
         } else if (error.response?.status === 400) {
-          const message = error.response.data.message || 'Tidak dapat menghapus jenis yang masih memiliki produk';
+          const message = error.response.data.message || 'Tidak dapat dihapus karena jenis telah digunakan';
           this.showToast('error', 'Gagal Hapus Jenis', message);
         } else {
           const message = error.response?.data?.message || 'Terjadi kesalahan saat menghapus jenis';

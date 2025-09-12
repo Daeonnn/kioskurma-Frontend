@@ -89,12 +89,9 @@
                   <input
                     v-model="searchTerm"
                     type="text"
-                    placeholder="TR001, TR001-TR005, atau nama kasir..."
+                    placeholder="TR atau nama kasir..."
                     class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
                   >
-                  <p class="text-xs text-gray-500 mt-1">
-                    💡 Tips: Gunakan "TR001-TR005" untuk cari rentang kode
-                  </p>
                 </div>
                 
                 <div class="flex gap-2 pt-2 border-t border-gray-200">
@@ -129,7 +126,7 @@
             </svg>
             <span>Cetak Laporan</span>
             <svg class="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+          
             </svg>
           </button>
 
@@ -242,7 +239,7 @@
               <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Harga</th>
               <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tanggal Cetak</th>
               <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Metode</th>
-              <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
+              <th class="px-6 py-4 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
             </tr>
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
@@ -1122,443 +1119,531 @@ const printReceipt = (transaction) => {
   }
 }
 
-    const printReport = (format = 'compact') => {
-      const user = JSON.parse(localStorage.getItem('user') || '{}')
-      const currentDate = new Date()
-      
-      let filterInfo = 'Semua Transaksi'
-      if (filters.value.start_date && filters.value.end_date) {
-        filterInfo = `Periode: ${formatDate(filters.value.start_date)} - ${formatDate(filters.value.end_date)}`
-      } else if (filters.value.start_date) {
-        filterInfo = `Dari: ${formatDate(filters.value.start_date)}`
-      } else if (filters.value.end_date) {
-        filterInfo = `Sampai: ${formatDate(filters.value.end_date)}`
-      }
-      
-      if (filters.value.payment_method) {
-        filterInfo += ` | Metode: ${filters.value.payment_method.toUpperCase()}`
-      }
-      
-      if (filters.value.discount_filter) {
-        const discountDesc = filters.value.discount_filter === 'with_discount' 
-          ? 'Dengan Diskon' 
-          : 'Tanpa Diskon'
-        filterInfo += ` | Filter: ${discountDesc}`
-      }
+   const printReport = (format = 'compact') => {
+  const user = JSON.parse(localStorage.getItem('user') || '{}')
+  const currentDate = new Date()
+  
+  let filterInfo = 'Semua Transaksi'
+  if (filters.value.start_date && filters.value.end_date) {
+    filterInfo = `Periode: ${formatDate(filters.value.start_date)} - ${formatDate(filters.value.end_date)}`
+  } else if (filters.value.start_date) {
+    filterInfo = `Dari: ${formatDate(filters.value.start_date)}`
+  } else if (filters.value.end_date) {
+    filterInfo = `Sampai: ${formatDate(filters.value.end_date)}`
+  }
 
-      const grandTotal = filteredTransactions.value.reduce((total, transaction) => total + parseFloat(transaction.total_price || 0), 0)
-      const totalDiscount = filteredTransactions.value.reduce((total, transaction) => total + parseFloat(transaction.discount_amount || 0), 0)
-      const reportDate = utils.formatDateNice(currentDate)
+  if (filters.value.payment_method) {
+    filterInfo += ` | Metode: ${filters.value.payment_method.toUpperCase()}`
+  }
 
-      showPrintMenu.value = false
+  if (filters.value.discount_filter) {
+    const discountDesc = filters.value.discount_filter === 'with_discount' 
+      ? 'Dengan Diskon' 
+      : 'Tanpa Diskon'
+    filterInfo += ` | Filter: ${discountDesc}`
+  }
 
-      if (format === 'a4') {
-        printA4Report(filterInfo, grandTotal, totalDiscount, reportDate, user)
-      } else {
-        printCompactReport(filterInfo, grandTotal, totalDiscount, reportDate, user)
-      }
-    }
+  const grandTotal = filteredTransactions.value.reduce((total, transaction) => total + parseFloat(transaction.total_price || 0), 0)
+  const totalDiscount = filteredTransactions.value.reduce((total, transaction) => total + parseFloat(transaction.discount_amount || 0), 0)
+  const totalSubtotal = filteredTransactions.value.reduce((total, transaction) => total + getSubtotalAmount(transaction), 0)
+  const totalItems = filteredTransactions.value.reduce((total, transaction) => {
+    return total + (transaction.details ? transaction.details.reduce((sum, detail) => sum + detail.quantity, 0) : 1)
+  }, 0)
 
-    const printA4Report = (filterInfo, grandTotal, totalDiscount, reportDate, user) => {
-      const tableRows = filteredTransactions.value.map((transaction, index) => {
-        const itemCount = transaction.details ? transaction.details.reduce((total, detail) => total + detail.quantity, 0) : 1
-        const subtotal = getSubtotalAmount(transaction)
-        const discountDisplay = hasDiscount(transaction) 
-          ? formatDiscountDisplay(transaction)
-          : '-'
-        const discountAmount = hasDiscount(transaction) 
-          ? formatCurrency(transaction.discount_amount)
-          : '-'
-        
-        return `<tr>
-          <td class="border-cell text-center">${index + 1}</td>
-          <td class="border-cell text-center code-cell">${transaction.transaction_code}</td>
-          <td class="border-cell">${transaction.user?.name || 'Pembeli'}</td>
-          <td class="border-cell text-center">${itemCount}</td>
-          <td class="border-cell text-right">${formatCurrency(subtotal)}</td>
-          <td class="border-cell text-center">${discountDisplay}</td>
-          <td class="border-cell text-right">${discountAmount}</td>
-          <td class="border-cell text-right total-cell">${formatCurrency(transaction.total_price)}</td>
-          <td class="border-cell text-center date-cell">${formatDate(transaction.date)}</td>
-        </tr>`
-      }).join('')
+  const reportDate = utils.formatDateNice(currentDate)
+  showPrintMenu.value = false
 
-      const reportContent = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>Laporan Transaksi - GROSIR KURMA PONTIANAK</title>
-            <meta charset="UTF-8">
-            <style>
-              @page {
-                size: A4;
-                margin: 30mm 25mm;
-              }
-              
-              * {
-                margin: 0;
-                padding: 0;
-                box-sizing: border-box;
-              }
-              
-              body {
-                font-family: 'Arial', sans-serif;
-                font-size: 10px;
-                line-height: 1.3;
-                color: #333;
-                max-width: 170mm;
-                margin: 0 auto;
-                padding: 0 5mm;
-              }
-              
-              .header {
-                text-align: center;
-                margin-bottom: 25px;
-                border-bottom: 2px solid #333;
-                padding-bottom: 15px;
-              }
-              
-              .header h1 {
-                font-size: 20px;
-                font-weight: bold;
-                margin-bottom: 5px;
-                color: #1e40af;
-              }
-              
-              .header h2 {
-                font-size: 16px;
-                margin-bottom: 8px;
-                color: #374151;
-              }
-              
-              .header p {
-                font-size: 12px;
-                color: #6b7280;
-              }
-              
-              .info-section {
-                background-color: #f8fafc;
-                padding: 12px;
-                border-radius: 6px;
-                border: 1px solid #e2e8f0;
-                margin-bottom: 20px;
-              }
-              
-              .info-row {
-                display: flex;
-                justify-content: space-between;
-                margin-bottom: 6px;
-              }
-              
-              .info-label {
-                font-weight: bold;
-                color: #374151;
-              }
-              
-              .table-container {
-                margin: 15px 0;
-                padding: 0;
-              }
-              
-              .report-table {
-                width: 100%;
-                max-width: 160mm;
-                margin: 0 auto;
-                border-collapse: collapse;
-                background: white;
-                font-size: 9px;
-              }
-              
-              .report-table th {
-                background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
-                color: white;
-                font-weight: bold;
-                font-size: 8px;
-                text-align: center;
-                padding: 6px 3px;
-                border: 1px solid #1e40af;
-              }
-              
-              .border-cell {
-                border: 1px solid #d1d5db;
-                padding: 4px 3px;
-                font-size: 8px;
-              }
-              
-              .code-cell {
-                font-family: 'Courier New', monospace;
-                font-weight: bold;
-                background-color: #f1f5f9;
-                font-size: 7px;
-              }
-              
-              .total-cell {
-                font-weight: bold;
-                color: #059669;
-                font-size: 8px;
-              }
-              
-              .date-cell {
-                font-size: 7px;
-              }
-              
-              .text-center { text-align: center; }
-              .text-right { text-align: right; }
-              .text-left { text-align: left; }
-              
-              .summary-section {
-                margin-top: 20px;
-                display: flex;
-                justify-content: center;
-                padding: 0;
-              }
-              
-              .summary-box {
-                background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-                border: 1px solid #cbd5e1;
-                border-radius: 6px;
-                padding: 12px;
-                width: 220px;
-                max-width: 100%;
-              }
-              
-              .summary-row {
-                display: flex;
-                justify-content: space-between;
-                margin-bottom: 6px;
-                font-size: 10px;
-              }
-              
-              .summary-total {
-                border-top: 1px solid #374151;
-                padding-top: 6px;
-                margin-top: 6px;
-                font-size: 11px;
-                font-weight: bold;
-                color: #1e40af;
-              }
-              
-              .discount-highlight {
-                color: #dc2626;
-                font-weight: bold;
-              }
-              
-              .footer {
-                margin-top: 30px;
-                text-align: center;
-                font-size: 10px;
-                color: #6b7280;
-                border-top: 1px solid #e5e7eb;
-                padding-top: 15px;
-              }
-              
-              .page-break {
-                page-break-before: always;
-              }
-              
-              @media print {
-                body { 
-                  font-size: 9px;
-                  max-width: 165mm;
-                  margin: 0 auto;
-                }
-                .header h1 { font-size: 16px; }
-                .header h2 { font-size: 13px; }
-                .no-print { display: none !important; }
-                .report-table th { -webkit-print-color-adjust: exact; }
-                .report-table { font-size: 8px; }
-                .border-cell { padding: 3px 2px; }
-              }
-            </style>
-          </head>
-          <body>
-            <div class="header">
-              <h1>GROSIR KURMA PONTIANAK</h1>
-              <h2>LAPORAN TRANSAKSI</h2>
-              <p>Jl. Raya Pontianak - Telp: 0812-2100-6766</p>
-            </div>
-            
-            <div class="info-section">
-              <div class="info-row">
-                <span class="info-label">Filter Laporan:</span>
-                <span>${filterInfo}</span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">Tanggal Cetak:</span>
-                <span>${reportDate}</span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">Dicetak Oleh:</span>
-                <span>${user.name || 'Administrator'}</span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">Total Data:</span>
-                <span>${filteredTransactions.value.length} Transaksi</span>
-              </div>
-            </div>
-            
-            <div class="table-container">
-              <table class="report-table">
-                <thead>
-                  <tr>
-                    <th style="width: 6%;">No</th>
-                    <th style="width: 15%;">Kode</th>
-                    <th style="width: 12%;">Kasir</th>
-                    <th style="width: 8%;">Qty</th>
-                    <th style="width: 15%;">Subtotal</th>
-                    <th style="width: 10%;">Diskon</th>
-                    <th style="width: 12%;">Nilai</th>
-                    <th style="width: 15%;">Total</th>
-                    <th style="width: 7%;">Tgl</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${tableRows}
-                </tbody>
-              </table>
-            </div>
-            
-            <div class="summary-section">
-              <div class="summary-box">
-                <div class="summary-row">
-                  <span>Jumlah Transaksi:</span>
-                  <span><strong>${filteredTransactions.value.length}</strong></span>
-                </div>
-                <div class="summary-row">
-                  <span>Total Diskon:</span>
-                  <span class="discount-highlight">Rp ${formatCurrency(totalDiscount)}</span>
-                </div>
-                <div class="summary-row summary-total">
-                  <span>GRAND TOTAL:</span>
-                  <span>Rp ${formatCurrency(grandTotal)}</span>
-                </div>
-              </div>
-            </div>
-            
-            <div class="footer">
-              <p><strong>GROSIR KURMA PONTIANAK</strong></p>
-              <p>Laporan ini dicetak pada ${reportDate} oleh ${user.name || 'Administrator'}</p>
-              <p>Powered by KIOS KURMA POS System</p>
-            </div>
-          </body>
-        </html>
-      `
-      
-      const printWindow = window.open('', '_blank')
-      if (printWindow) {
-        printWindow.document.write(reportContent)
-        printWindow.document.close()
-        
-        setTimeout(() => {
-          printWindow.print()
-          printWindow.close()
-        }, 500)
-        
-        showToastNotification('Laporan A4 berhasil dicetak!', 'success')
-      } else {
-        showToastNotification('Gagal membuka window print!', 'error')
-      }
-    }
+  if (format === 'a4') {
+    printA4Report(filterInfo, grandTotal, totalDiscount, totalSubtotal, totalItems, reportDate, user)
+  } else {
+    printCompactReport(filterInfo, grandTotal, totalDiscount, totalSubtotal, totalItems, reportDate, user)
+  }
+}
 
-    const printCompactReport = (filterInfo, grandTotal, totalDiscount, reportDate, user) => {
-      const tableRows = filteredTransactions.value.map((transaction, index) => {
-        const itemCount = transaction.details ? transaction.details.reduce((total, detail) => total + detail.quantity, 0) : 1
-        const subtotal = getSubtotalAmount(transaction)
-        const discountDisplay = hasDiscount(transaction) 
-          ? `${formatDiscountDisplay(transaction)}\n(-${formatCurrency(transaction.discount_amount)})` 
-          : '-'
-        
-        return `<tr style="font-size: 12px;">
-          <td style="border: 1px solid #000; padding: 4px; text-align: center;">${index + 1}</td>
-          <td style="border: 1px solid #000; padding: 4px; text-align: center; font-size: 10px;">${transaction.transaction_code}</td>
-          <td style="border: 1px solid #000; padding: 4px; text-align: left;">${transaction.user?.name || 'Pembeli'}</td>
-          <td style="border: 1px solid #000; padding: 4px; text-align: center;">${itemCount}</td>
-          <td style="border: 1px solid #000; padding: 4px; text-align: right;">${formatCurrency(subtotal)}</td>
-          <td style="border: 1px solid #000; padding: 4px; text-align: center; font-size: 10px; white-space: pre-line;">${discountDisplay}</td>
-          <td style="border: 1px solid #000; padding: 4px; text-align: right; font-weight: bold;">${formatCurrency(transaction.total_price)}</td>
-          <td style="border: 1px solid #000; padding: 4px; text-align: center; font-size: 10px;">${formatDate(transaction.date)}</td>
-        </tr>`
-      }).join('')
+const printA4Report = (filterInfo, grandTotal, totalDiscount, totalSubtotal, totalItems, reportDate, user) => {
+  const tableRows = filteredTransactions.value.map((transaction, index) => {
+    const itemCount = transaction.details ? transaction.details.reduce((total, detail) => total + detail.quantity, 0) : 1
+    const subtotal = getSubtotalAmount(transaction)
+    const discountDisplay = hasDiscount(transaction) 
+      ? formatDiscountDisplay(transaction)
+      : '-'
+    const discountAmount = hasDiscount(transaction) 
+      ? formatCurrency(transaction.discount_amount)
+      : '-'
 
-      const reportContent = `
-        <html>
-          <head>
-            <title>Laporan Transaksi - GROSIR KURMA PONTIANAK</title>
-            <style>
-              body { font-family: Arial, sans-serif; margin: 10px; font-size: 12px; }
-              .header { text-align: center; margin-bottom: 20px; }
-              .header h2 { margin: 0; font-size: 16px; font-weight: bold; }
-              .header p { margin: 3px 0; font-size: 12px; }
-              .table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-              .table th { border: 1px solid #000; padding: 6px; text-align: center; background-color: #f0f0f0; font-weight: bold; font-size: 11px; }
-              .table td { border: 1px solid #000; padding: 4px; font-size: 10px; }
-              .grand-total { margin-top: 15px; text-align: right; font-weight: bold; }
-              .info { margin-bottom: 15px; font-size: 10px; }
-              @media print {
-                body { margin: 0; }
-                .table th { background-color: #f0f0f0 !important; -webkit-print-color-adjust: exact; }
-              }
-            </style>
-          </head>
-          <body>
-            <div class="header">
-              <h2>LAPORAN TRANSAKSI</h2>
-              <p>GROSIR KURMA PONTIANAK</p>
-            </div>
-            
-            <div class="info">
-              <p><strong>Filter:</strong> ${filterInfo}</p>
-              <p><strong>Dicetak:</strong> ${reportDate} oleh ${user.name || 'Admin'}</p>
-            </div>
-            
-            <table class="table">
-              <thead>
-                <tr>
-                  <th style="width: 4%;">No</th>
-                  <th style="width: 12%;">Kode</th>
-                  <th style="width: 15%;">Kasir</th>
-                  <th style="width: 8%;">Item</th>
-                  <th style="width: 15%;">Subtotal</th>
-                  <th style="width: 15%;">Diskon</th>
-                  <th style="width: 15%;">Total</th>
-                  <th style="width: 12%;">Tanggal</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${tableRows}
-              </tbody>
-            </table>
-            
-            <div style="text-align: right; margin-top: 15px; font-size: 12px;">
-              <div style="background-color: #f9f9f9; padding: 10px; border: 1px solid #ddd; display: inline-block; min-width: 200px;">
-                <p style="margin: 0;"><strong>Total Transaksi:</strong> ${filteredTransactions.value.length}</p>
-                <p style="margin: 0; color: #e74c3c;"><strong>Total Diskon:</strong> Rp ${formatCurrency(totalDiscount)}</p>
-                <p style="margin: 0; font-size: 14px; padding-top: 5px; border-top: 1px solid #ddd;"><strong>GRAND TOTAL:</strong> Rp ${formatCurrency(grandTotal)}</p>
-              </div>
-            </div>
-            
-            <div class="footer" style="margin-top: 20px; text-align: center; font-size: 10px; border-top: 1px solid #ddd; padding-top: 10px;">
-              <p>Laporan ini dicetak pada ${reportDate} oleh ${user.name || 'Admin'}</p>
-              <p>Powered by KIOS KURMA POS System</p>
-            </div>
-          </body>
-        </html>
-      `
-      
-      const printWindow = window.open('', '_blank')
-      if (printWindow) {
-        printWindow.document.write(reportContent)
-        printWindow.document.close()
-        
-        setTimeout(() => {
-          printWindow.print()
-          printWindow.close()
-        }, 500)
-        
-        showToastNotification('Laporan berhasil dicetak!', 'success')
-      } else {
-        showToastNotification('Gagal membuka window print!', 'error')
-      }
+    return `<tr>
+      <td class="border-cell text-center">${index + 1}</td>
+      <td class="border-cell text-center date-cell">${formatDate(transaction.date)}</td>
+      <td class="border-cell text-center code-cell">${transaction.transaction_code}</td>
+      <td class="border-cell">${transaction.user?.name || 'Pembeli'}</td>
+      <td class="border-cell text-center">${itemCount}</td>
+      <td class="border-cell text-right">${formatCurrency(subtotal)}</td>
+      <td class="border-cell text-center">${discountDisplay}</td>
+      <td class="border-cell text-right">${discountAmount}</td>
+      <td class="border-cell text-right total-cell">${formatCurrency(transaction.total_price)}</td>
+    </tr>`
+  }).join('')
+
+  // Baris Total di bawah tabel
+  const totalRow = `
+    <tr class="total-row">
+      <td class="border-cell text-center" colspan="4"><strong>TOTAL</strong></td>
+      <td class="border-cell text-center"><strong>${totalItems}</strong></td>
+      <td class="border-cell text-right"><strong>${formatCurrency(totalSubtotal)}</strong></td>
+      <td class="border-cell text-center">-</td>
+      <td class="border-cell text-right"><strong>${formatCurrency(totalDiscount)}</strong></td>
+      <td class="border-cell text-right total-cell"><strong>${formatCurrency(grandTotal)}</strong></td>
+    </tr>`
+
+  const reportContent = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>Laporan Transaksi - GROSIR KURMA PONTIANAK</title>
+        <meta charset="UTF-8">
+        <style>
+          @page {
+            size: A4;
+            margin: 20mm 15mm;
+          }
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
+          body {
+            font-family: 'Arial', sans-serif;
+            font-size: 11px;
+            line-height: 1.4;
+            color: #333;
+            max-width: 180mm;
+            margin: 0 auto;
+          }
+          
+          /* Header Perusahaan */
+          .company-header {
+            text-align: center;
+            margin-bottom: 25px;
+            padding-bottom: 20px;
+            border-bottom: 3px double #333;
+          }
+          .company-name {
+            font-size: 22px;
+            font-weight: bold;
+            color: #1e40af;
+            margin-bottom: 8px;
+            letter-spacing: 1px;
+          }
+          .company-address {
+            font-size: 12px;
+            color: #555;
+            line-height: 1.4;
+            margin-bottom: 3px;
+          }
+          .company-phone {
+            font-size: 12px;
+            color: #555;
+            font-weight: 500;
+          }
+          
+          /* Judul Laporan */
+          .report-title {
+            text-align: center;
+            margin: 20px 0;
+            font-size: 16px;
+            font-weight: bold;
+            text-decoration: underline;
+            color: #333;
+          }
+          
+          .info-section {
+            background-color: #f8f9fa;
+            padding: 12px;
+            border-radius: 5px;
+            border: 1px solid #dee2e6;
+            margin-bottom: 20px;
+          }
+          .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            font-size: 11px;
+          }
+          .info-label {
+            font-weight: bold;
+            color: #495057;
+          }
+          
+          /* Tabel */
+          .report-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background: white;
+          }
+          .report-table th {
+            background: #2c3e50;
+            color: white;
+            font-weight: bold;
+            font-size: 10px;
+            text-align: center;
+            padding: 8px 5px;
+            border: 1px solid #2c3e50;
+          }
+          .border-cell {
+            border: 1px solid #ddd;
+            padding: 6px 5px;
+            font-size: 10px;
+          }
+          .code-cell {
+            font-family: 'Courier New', monospace;
+            font-weight: 600;
+            background-color: #f8f9fa;
+          }
+          .date-cell {
+            white-space: nowrap;
+          }
+          .total-cell {
+            font-weight: bold;
+            color: #28a745;
+          }
+          .text-center { text-align: center; }
+          .text-right { text-align: right; }
+          .text-left { text-align: left; }
+          
+          /* Baris Total */
+          .total-row {
+            background-color: #e9ecef;
+            font-weight: bold;
+          }
+          .total-row td {
+            border: 2px solid #495057;
+            padding: 8px 5px;
+          }
+          
+          /* Ringkasan */
+          .summary-section {
+            margin-top: 25px;
+            display: flex;
+            justify-content: flex-end;
+          }
+          .summary-box {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border: 2px solid #495057;
+            border-radius: 8px;
+            padding: 15px;
+            width: 300px;
+          }
+          .summary-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 12px;
+          }
+          .summary-total {
+            border-top: 2px solid #333;
+            padding-top: 8px;
+            margin-top: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            color: #1e40af;
+          }
+          
+          /* Footer */
+          .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #dee2e6;
+            text-align: center;
+            font-size: 10px;
+            color: #6c757d;
+          }
+          .footer-info {
+            margin-bottom: 5px;
+          }
+          
+          @media print {
+            body { 
+              font-size: 10px;
+            }
+            .report-table th { 
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            .total-row {
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <!-- Header Perusahaan -->
+        <div class="company-header">
+          <div class="company-name">GROSIR KURMA PONTIANAK</div>
+          <div class="company-address">Jl. Mitra Perdana No.5, Parit Tokaya, Kec. Pontianak Sel.</div>
+          <div class="company-address">Kota Pontianak, Kalimantan Barat 78115</div>
+          <div class="company-phone">Telepon: 0812-2100-6766</div>
+        </div>
+
+        <!-- Judul Laporan -->
+        <div class="report-title">LAPORAN TRANSAKSI PENJUALAN</div>
+
+        <!-- Info Filter -->
+        <div class="info-section">
+          <div class="info-row">
+            <span class="info-label">Filter Laporan:</span>
+            <span>${filterInfo}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Jumlah Transaksi:</span>
+            <span>${filteredTransactions.value.length} Transaksi</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Dicetak:</span>
+            <span>${reportDate} oleh ${user.name || 'Administrator'}</span>
+          </div>
+        </div>
+
+        <!-- Tabel Transaksi -->
+        <table class="report-table">
+          <thead>
+            <tr>
+              <th style="width: 5%;">No</th>
+              <th style="width: 11%;">Tanggal</th>
+              <th style="width: 14%;">Kode Transaksi</th>
+              <th style="width: 16%;">Penjual</th>
+              <th style="width: 8%;">Item</th>
+              <th style="width: 13%;">Subtotal</th>
+              <th style="width: 10%;">Diskon</th>
+              <th style="width: 11%;">Jumlah Diskon</th>
+              <th style="width: 13%;">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tableRows}
+            ${totalRow}
+          </tbody>
+        </table>
+
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+          <div class="footer-info">
+            <strong>GROSIR KURMA PONTIANAK</strong>
+          </div>
+          <div class="footer-info">
+            © 2024 
+          </div>
+        </div>
+      </body>
+    </html>
+  `
+
+  const printWindow = window.open('', '_blank')
+  if (printWindow) {
+    printWindow.document.write(reportContent)
+    printWindow.document.close()
+    setTimeout(() => {
+      printWindow.print()
+      printWindow.close()
+    }, 500)
+    showToastNotification('Laporan A4 berhasil dicetak!', 'success')
+  } else {
+    showToastNotification('Gagal membuka window print!', 'error')
+  }
+}
+
+const printCompactReport = (filterInfo, grandTotal, totalDiscount, totalSubtotal, totalItems, reportDate, user) => {
+  const tableRows = filteredTransactions.value.map((transaction, index) => {
+    const itemCount = transaction.details ? transaction.details.reduce((total, detail) => total + detail.quantity, 0) : 1
+    const subtotal = getSubtotalAmount(transaction)
+    const discountDisplay = hasDiscount(transaction) 
+      ? `${formatDiscountDisplay(transaction)}` 
+      : '-'
+    const discountAmount = hasDiscount(transaction) 
+      ? formatCurrency(transaction.discount_amount)
+      : '-'
+
+    return `<tr>
+      <td style="border: 1px solid #000; padding: 4px; text-align: center;">${index + 1}</td>
+      <td style="border: 1px solid #000; padding: 4px; text-align: center; font-size: 9px;">${formatDate(transaction.date)}</td>
+      <td style="border: 1px solid #000; padding: 4px; text-align: center; font-size: 9px;">${transaction.transaction_code}</td>
+      <td style="border: 1px solid #000; padding: 4px; text-align: left;">${transaction.user?.name || 'Pembeli'}</td>
+      <td style="border: 1px solid #000; padding: 4px; text-align: center;">${itemCount}</td>
+      <td style="border: 1px solid #000; padding: 4px; text-align: right;">Rp. ${formatCurrency(subtotal)}</td>
+      <td style="border: 1px solid #000; padding: 4px; text-align: center; font-size: 9px;">${discountDisplay}</td>
+      <td style="border: 1px solid #000; padding: 4px; text-align: right;">Rp. ${discountAmount}</td>
+      <td style="border: 1px solid #000; padding: 4px; text-align: right; font-weight: bold;">Rp. ${formatCurrency(transaction.total_price)}</td>
+    </tr>`
+  }).join('')
+
+  // Baris Total
+  const totalRow = `
+    <tr style="background-color: #f0f0f0; font-weight: bold;">
+      <td style="border: 2px solid #000; padding: 6px; text-align: center;" colspan="4">TOTAL</td>
+      <td style="border: 2px solid #000; padding: 6px; text-align: center;">${totalItems}</td>
+      <td style="border: 2px solid #000; padding: 6px; text-align: right;">Rp. ${formatCurrency(totalSubtotal)}</td>
+      <td style="border: 2px solid #000; padding: 6px; text-align: center;">-</td>
+      <td style="border: 2px solid #000; padding: 6px; text-align: right;">Rp. ${formatCurrency(totalDiscount)}</td>
+      <td style="border: 2px solid #000; padding: 6px; text-align: right;">Rp. ${formatCurrency(grandTotal)}</td>
+    </tr>`
+
+  const reportContent = `
+    <html>
+      <head>
+        <title>Laporan Transaksi - GROSIR KURMA PONTIANAK</title>
+        <style>
+          body { 
+            font-family: Arial, sans-serif; 
+            margin: 10px; 
+            font-size: 11px; 
+          }
+          .company-header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #000;
+          }
+          .company-name {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 5px;
+          }
+          .company-info {
+            font-size: 10px;
+            line-height: 1.3;
+          }
+          .report-title {
+            text-align: center;
+            font-size: 14px;
+            font-weight: bold;
+            margin: 15px 0;
+            text-decoration: underline;
+          }
+          .info {
+            margin-bottom: 15px;
+            font-size: 9px;
+            padding: 8px;
+          }
+          .table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-top: 15px; 
+          }
+          .table th { 
+            border: 1px solid #000; 
+            padding: 6px; 
+            text-align: center; 
+            background-color: #333; 
+            color: white;
+            font-weight: bold; 
+            font-size: 10px; 
+          }
+          .table td { 
+            border: 1px solid #000; 
+            padding: 4px; 
+            font-size: 9px; 
+          }
+          .summary {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f9f9f9;
+            border: 1px solid #333;
+            text-align: right;
+          }
+          .summary-item {
+            margin: 5px 0;
+            font-size: 11px;
+          }
+          .grand-total {
+            border-top: 2px solid #333;
+            padding-top: 8px;
+            margin-top: 8px;
+            font-size: 13px;
+            font-weight: bold;
+          }
+          .footer {
+            margin-top: 25px;
+            text-align: center;
+            font-size: 9px;
+            color: #666;
+            border-top: 1px solid #ddd;
+            padding-top: 10px;
+          }
+          @media print {
+            body { margin: 0; }
+            .table th { 
+              background-color: #333 !important; 
+              color: white !important;
+              -webkit-print-color-adjust: exact; 
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <!-- Header Perusahaan -->
+        <div class="company-header">
+          <div class="company-name">GROSIR KURMA PONTIANAK</div>
+          <div class="company-info">
+            Jl. Mitra Perdana No.5, Parit Tokaya, Kec. Pontianak Sel.<br>
+            Kota Pontianak, Kalimantan Barat 78115<br>
+            Telepon: 0812-2100-6766
+          </div>
+        </div>
+
+        <!-- Judul -->
+        <div class="report-title">LAPORAN TRANSAKSI</div>
+
+        <!-- Info -->
+        <div class="info">
+          ${filterInfo}<br>
+          ${reportDate} oleh ${user.name || 'Admin'}
+        </div>
+
+        <!-- Tabel -->
+        <table class="table">
+          <thead>
+            <tr>
+              <th style="width: 4%;">No</th>
+              <th style="width: 10%;">Tanggal</th>
+              <th style="width: 13%;">Kode</th>
+              <th style="width: 15%;">Penjual</th>
+              <th style="width: 8%;">Item</th>
+              <th style="width: 13%;">Subtotal</th>
+              <th style="width: 10%;">Diskon</th>
+              <th style="width: 12%;">Jumlah Diskon</th>
+              <th style="width: 15%;">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tableRows}
+            ${totalRow}
+          </tbody>
+        </table>
+
+        <!-- Footer -->
+        <div class="footer">
+          © 2024 GROSIR KURMA PONTIANAK 
+        </div>
+      </body>
+    </html>
+  `
+
+  const printWindow = window.open('', '_blank')
+  if (printWindow) {
+    printWindow.document.write(reportContent)
+    printWindow.document.close()
+    setTimeout(() => {
+      printWindow.print()
+      printWindow.close()
+    }, 500)
+    showToastNotification('Laporan berhasil dicetak!', 'success')
+  } else {
+    showToastNotification('Gagal membuka window print!', 'error')
+  }
     }
 
     const showToastNotification = (message, type = 'success') => {

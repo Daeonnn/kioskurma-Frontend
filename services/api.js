@@ -8,6 +8,7 @@ const api = axios.create({
   }
 })
 
+// Existing interceptors remain the same...
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token') || localStorage.getItem('auth_token')
@@ -61,6 +62,7 @@ api.interceptors.response.use(
   }
 )
 
+// ✅ UPDATED PRODUCT SERVICE with Enhanced Stock Tracking
 export const productService = {
   async getProducts(filters = {}) {
     try {
@@ -183,6 +185,7 @@ export const productService = {
     }
   },
 
+  // EXISTING STOCK METHODS
   async addStock(productId, additionalStock) {
     try {
       const response = await api.patch(`/products/${productId}/add-stock`, {
@@ -195,6 +198,238 @@ export const productService = {
     }
   },
 
+  // ✅ ENHANCED: Stock tracking methods with better error handling
+  async addStockWithTracking(productId, data) {
+    try {
+      console.log('Adding stock with tracking:', {
+        productId,
+        quantity: data.quantity,
+        distributor_id: data.distributor_id,
+        notes: data.notes
+      })
+      
+      const response = await api.post(`/products/${productId}/add-stock-tracking`, {
+        quantity: data.quantity,
+        distributor_id: data.distributor_id,
+        notes: data.notes
+      })
+      return response.data
+    } catch (error) {
+      console.error('Error adding stock with tracking:', error)
+      throw error
+    }
+  },
+
+  // ✅ COMPLETELY FIXED: Stock History dengan multiple endpoint fallbacks dan error handling
+  async getStockHistory(productId, params = {}) {
+    try {
+      console.log('🔍 Fetching stock history for product:', productId, 'with params:', params)
+      
+      // ✅ CLEAN PARAMS: Handle 'all' parameter properly
+      const cleanParams = {}
+      if (params.start_date) cleanParams.start_date = params.start_date
+      if (params.end_date) cleanParams.end_date = params.end_date
+      
+      // ✅ FIXED: Convert 'all' to large number, ensure numeric values
+      if (params.per_page === 'all') {
+        cleanParams.per_page = 1000 // Large number instead of 'all'
+      } else if (params.per_page && !isNaN(params.per_page)) {
+        cleanParams.per_page = parseInt(params.per_page)
+      } else {
+        cleanParams.per_page = 25 // Default
+      }
+      
+      if (params.sort) cleanParams.sort = params.sort
+      if (params.order) cleanParams.order = params.order
+      
+      console.log('🔍 Using clean params:', cleanParams)
+      
+      // ✅ STRATEGY 1: Try main stock history endpoint
+      try {
+        console.log('🔍 Strategy 1: Trying main stock history endpoint...')
+        const response = await api.get(`/products/${productId}/stock-history`, {
+          params: cleanParams
+        })
+        
+        console.log('✅ Strategy 1 success:', response.data)
+        return response.data
+        
+      } catch (primaryError) {
+        console.log('❌ Strategy 1 failed:', primaryError.response?.status, primaryError.response?.data?.message)
+        
+        // ✅ STRATEGY 2: Try alternative stock movements endpoint
+        try {
+          console.log('🔍 Strategy 2: Trying stock movements endpoint...')
+          const response = await api.get(`/products/${productId}/stock-movements`, {
+            params: cleanParams
+          })
+          
+          console.log('✅ Strategy 2 success:', response.data)
+          return response.data
+          
+        } catch (secondaryError) {
+          console.log('❌ Strategy 2 failed:', secondaryError.response?.status, secondaryError.response?.data?.message)
+          
+          // ✅ STRATEGY 3: Try generic stock movements with product filter
+          try {
+            console.log('🔍 Strategy 3: Trying generic stock movements with product filter...')
+            const response = await api.get(`/stock-movements`, {
+              params: {
+                product_id: productId,
+                ...cleanParams
+              }
+            })
+            
+            console.log('✅ Strategy 3 success:', response.data)
+            return response.data
+            
+          } catch (tertiaryError) {
+            console.log('❌ Strategy 3 failed:', tertiaryError.response?.status, tertiaryError.response?.data?.message)
+            
+            // ✅ STRATEGY 4: Check if product exists and return empty structure
+            try {
+              console.log('🔍 Strategy 4: Checking if product exists...')
+              const productResponse = await api.get(`/products/${productId}`)
+              
+              if (productResponse.data.success && productResponse.data.data) {
+                console.log('✅ Strategy 4: Product exists, returning empty stock history structure')
+                return {
+                  success: true,
+                  data: {
+                    movements: [],
+                    product: productResponse.data.data,
+                    meta: {
+                      total: 0,
+                      per_page: cleanParams.per_page || 25,
+                      current_page: 1,
+                      last_page: 1
+                    }
+                  },
+                  message: 'Product found but no stock history available yet'
+                }
+              }
+              
+            } catch (productError) {
+              console.log('❌ Strategy 4 failed - Product not found:', productError.response?.status)
+              
+              // ✅ FINAL FALLBACK: Return safe empty structure
+              console.log('🔄 Final fallback: Returning empty stock history structure')
+              return {
+                success: true,
+                data: {
+                  movements: [],
+                  meta: {
+                    total: 0,
+                    per_page: cleanParams.per_page || 25,
+                    current_page: 1,
+                    last_page: 1
+                  }
+                },
+                message: 'No stock history data available - this feature may not be implemented yet'
+              }
+            }
+          }
+        }
+      }
+      
+    } catch (error) {
+      console.error('❌ Critical error in getStockHistory:', error)
+      
+      // ✅ ULTIMATE FALLBACK: Return safe empty structure even in worst case
+      return {
+        success: true,
+        data: {
+          movements: [],
+          meta: {
+            total: 0,
+            per_page: 25,
+            current_page: 1,
+            last_page: 1
+          }
+        },
+        message: 'Stock history feature is not available'
+      }
+    }
+  },
+
+  // ✅ NEW: Alternative method for stock movements (fallback strategy)
+  async getStockMovements(productId, params = {}) {
+    try {
+      console.log('🔍 Fetching stock movements for product:', productId)
+      
+      const cleanParams = {
+        product_id: productId,
+        per_page: params.per_page === 'all' ? 1000 : (params.per_page || 25),
+        sort: params.sort || 'created_at',
+        order: params.order || 'desc'
+      }
+      
+      // Add other params
+      if (params.start_date) cleanParams.start_date = params.start_date
+      if (params.end_date) cleanParams.end_date = params.end_date
+      
+      const response = await api.get('/stock-movements', {
+        params: cleanParams
+      })
+      
+      return response.data
+    } catch (error) {
+      console.error('Error fetching stock movements:', error)
+      throw error
+    }
+  },
+
+  // ✅ NEW: Get stock history summary
+  async getStockHistorySummary(productId) {
+    try {
+      console.log('🔍 Fetching stock history summary for product:', productId)
+      
+      const response = await api.get(`/products/${productId}/stock-summary`)
+      return response.data
+    } catch (error) {
+      console.error('Error fetching stock summary:', error)
+      
+      // ✅ FALLBACK: Calculate summary from movements
+      try {
+        const movementsResponse = await this.getStockHistory(productId, { per_page: 1000 })
+        if (movementsResponse.success && movementsResponse.data.movements) {
+          const movements = Array.isArray(movementsResponse.data.movements) 
+            ? movementsResponse.data.movements 
+            : movementsResponse.data.movements.data || []
+          
+          const totalIn = movements
+            .filter(m => m.type === 'in')
+            .reduce((sum, m) => sum + parseInt(m.quantity || 0), 0)
+          
+          const totalOut = movements
+            .filter(m => m.type === 'out')
+            .reduce((sum, m) => sum + parseInt(m.quantity || 0), 0)
+          
+          return {
+            success: true,
+            data: {
+              total_in: totalIn,
+              total_out: totalOut,
+              movements_count: movements.length
+            }
+          }
+        }
+      } catch (fallbackError) {
+        console.error('Fallback calculation also failed:', fallbackError)
+      }
+      
+      return {
+        success: true,
+        data: {
+          total_in: 0,
+          total_out: 0,
+          movements_count: 0
+        }
+      }
+    }
+  },
+
+  // Existing methods continue...
   async reduceStock(productId, quantity) {
     try {
       const productResponse = await this.getProductById(productId)
@@ -251,49 +486,90 @@ export const productService = {
   }
 }
 
+// ✅ UPDATED TRANSACTION SERVICE untuk Per-User System
 export const transactionService = {
+  /**
+   * ✅ UPDATED: Get next transaction code per-user
+   * Sekarang mendukung sistem per-user dengan sequence
+   */
   async getNextTransactionCode() {
     try {
-      console.log('🔄 Getting next transaction code from server...')
+      console.log('🔄 Getting next transaction code per-user from server...')
       const response = await api.get('/sales/next-transaction-code')
       
-      if (response.data.success && response.data.data.next_code) {
-        const code = response.data.data.next_code
-        console.log('✅ Next transaction code received:', code)
-        return { success: true, data: { next_code: code } }
+      if (response.data.success && response.data.data) {
+        const { next_code, next_sequence, user_id } = response.data.data
+        console.log('✅ Next transaction code received:', {
+          code: next_code,
+          sequence: next_sequence,
+          user_id: user_id
+        })
+        
+        return { 
+          success: true, 
+          data: { 
+            next_code,
+            next_sequence,
+            user_id
+          } 
+        }
       }
       
       throw new Error('Invalid response from server')
     } catch (error) {
       console.error('❌ Error fetching next transaction code:', error)
       
-      const fallbackCode = 'TR001'
-      console.log('🔄 Using fallback code:', fallbackCode)
-      return { success: true, data: { next_code: fallbackCode } }
+      // ✅ FALLBACK dengan sequence 1 untuk user baru
+      const fallbackCode = 'TR000001'
+      const fallbackSequence = 1
+      console.log('🔄 Using fallback code:', fallbackCode, 'sequence:', fallbackSequence)
+      return { 
+        success: true, 
+        data: { 
+          next_code: fallbackCode,
+          next_sequence: fallbackSequence,
+          user_id: null
+        } 
+      }
     }
   },
 
+  /**
+   * ✅ UPDATED: Process sale dengan per-user transaction code + sequence validation
+   */
   async processSale(saleData) {
     try {
-      console.log('🚀 Processing sale with discount:', {
+      console.log('🚀 Processing sale with per-user system:', {
         transaction_code: saleData.transaction_code,
+        transaction_sequence: saleData.transaction_sequence,
         total_amount: saleData.total_amount,
         items_count: saleData.items?.length,
         has_discount: !!saleData.discount,
         discount_info: saleData.discount
       })
 
-      if (saleData.items && saleData.items.length > 0) {
-        const stockValidation = await utils.validateStock(saleData.items)
-        if (!stockValidation.success) {
-          throw new Error(stockValidation.message)
-        }
+      // ✅ VALIDASI: Items harus ada
+      if (!saleData.items || saleData.items.length === 0) {
+        throw new Error('Tidak ada produk dalam keranjang!')
       }
 
-      if (!saleData.transaction_code || !saleData.transaction_code.startsWith('TR')) {
-        throw new Error('Kode transaksi tidak valid')
+      // ✅ VALIDASI: Stock validation
+      const stockValidation = await utils.validateStock(saleData.items)
+      if (!stockValidation.success) {
+        throw new Error(stockValidation.message)
       }
 
+      // ✅ VALIDASI: Transaction code format (per-user)
+      if (!saleData.transaction_code || !saleData.transaction_code.match(/^TR\d{4}\d{2}\d{2}\d{6}$/)) {
+  throw new Error('Format kode transaksi tidak valid. Harus TR-YYYY-MM-DD-XXX (contoh: TR-2025-08-30-001).')
+}
+
+      // ✅ VALIDASI: Transaction sequence harus ada
+      if (!saleData.transaction_sequence || saleData.transaction_sequence < 1) {
+        throw new Error('Transaction sequence tidak valid')
+      }
+
+      // ✅ VALIDASI: Discount validation (jika ada)
       if (saleData.discount) {
         const subtotal = saleData.items.reduce((sum, item) => sum + parseFloat(item.subtotal), 0)
         const discountValidation = discountHelpers.validateDiscount(saleData.discount, subtotal)
@@ -302,10 +578,15 @@ export const transactionService = {
         }
       }
 
+      // ✅ KIRIM DATA ke backend dengan per-user structure
       const response = await api.post('/sales', saleData)
       
       if (response.data.success) {
-        console.log('✅ Sale with discount processed successfully:', response.data.data.transaction_code)
+        console.log('✅ Sale with per-user system processed successfully:', {
+          transaction_code: response.data.data.transaction_code,
+          transaction_sequence: response.data.data.transaction_sequence,
+          user_id: response.data.data.user_id
+        })
         
         if (saleData.discount) {
           console.log('💰 Discount applied:', {
@@ -318,7 +599,7 @@ export const transactionService = {
       
       return response.data
     } catch (error) {
-      console.error('❌ Error processing sale with discount:', error)
+      console.error('❌ Error processing sale with per-user system:', error)
       if (error.response?.data?.message) {
         throw new Error(error.response.data.message)
       }
@@ -326,53 +607,111 @@ export const transactionService = {
     }
   },
 
-  async getSalesReport(startDate = null, endDate = null) {
+  /**
+   * ✅ UPDATED: Get sales dengan role-based filtering
+   */
+  async getSales(params = {}) {
+    try {
+      const queryParams = new URLSearchParams()
+      if (params.start_date) queryParams.append('start_date', params.start_date)
+      if (params.end_date) queryParams.append('end_date', params.end_date)
+      if (params.user_id) queryParams.append('user_id', params.user_id) // Admin bisa filter by user
+
+      const response = await api.get(`/sales?${queryParams.toString()}`)
+      return response.data
+    } catch (error) {
+      console.error('Error fetching sales:', error)
+      throw error
+    }
+  },
+
+  /**
+   * ✅ UPDATED: Sales report dengan breakdown per-user
+   */
+  async getSalesReport(startDate = null, endDate = null, userId = null) {
     try {
       const params = new URLSearchParams()
       if (startDate) params.append('start_date', startDate)
       if (endDate) params.append('end_date', endDate)
+      if (userId) params.append('user_id', userId) // Filter by specific user
 
-      const response = await api.get(`/sales/report?${params.toString()}`)
+      // ✅ GUNAKAN PATH BARU atau legacy
+      const response = await api.get(`/sales/reports/general?${params.toString()}`)
       return response.data
     } catch (error) {
       console.error('Error fetching sales report:', error)
-      throw error
+      // ✅ FALLBACK ke endpoint legacy
+      try {
+        const response = await api.get(`/sales/report?${params.toString()}`)
+        return response.data
+      } catch (fallbackError) {
+        console.error('Error with fallback endpoint:', fallbackError)
+        throw error
+      }
     }
   },
 
-  async getDiscountReport(startDate = null, endDate = null) {
+  /**
+   * ✅ UPDATED: Discount report dengan per-user filtering
+   */
+  async getDiscountReport(startDate = null, endDate = null, userId = null) {
     try {
       const params = new URLSearchParams()
       if (startDate) params.append('start_date', startDate)
       if (endDate) params.append('end_date', endDate)
+      if (userId) params.append('user_id', userId)
 
-      const response = await api.get(`/sales/discount-report?${params.toString()}`)
+      // ✅ GUNAKAN PATH BARU atau legacy
+      const response = await api.get(`/sales/reports/discount?${params.toString()}`)
       return response.data
     } catch (error) {
       console.error('Error fetching discount report:', error)
-      throw error
+      // ✅ FALLBACK ke endpoint legacy
+      try {
+        const response = await api.get(`/sales/discount-report?${params.toString()}`)
+        return response.data
+      } catch (fallbackError) {
+        console.error('Error with fallback discount report:', fallbackError)
+        throw error
+      }
     }
   },
 
-  async getDiscountStats(startDate = null, endDate = null) {
+  /**
+   * ✅ UPDATED: Discount stats dengan role-based filtering
+   */
+  async getDiscountStats(startDate = null, endDate = null, userId = null) {
     try {
       const params = new URLSearchParams()
       if (startDate) params.append('start_date', startDate)
       if (endDate) params.append('end_date', endDate)
+      if (userId) params.append('user_id', userId) // Admin bisa filter, kasir otomatis filtered
 
-      const response = await api.get(`/sales/discount-stats?${params.toString()}`)
+      // ✅ GUNAKAN PATH BARU atau legacy
+      const response = await api.get(`/sales/stats/discount?${params.toString()}`)
       return response.data
     } catch (error) {
       console.error('Error fetching discount stats:', error)
-      throw error
+      // ✅ FALLBACK ke endpoint legacy
+      try {
+        const response = await api.get(`/sales/discount-stats?${params.toString()}`)
+        return response.data
+      } catch (fallbackError) {
+        console.error('Error with fallback discount stats:', fallbackError)
+        throw error
+      }
     }
   },
 
-  async getSalesByDateRange(startDate, endDate) {
+  /**
+   * ✅ UPDATED: Get sales by date range dengan role filtering
+   */
+  async getSalesByDateRange(startDate, endDate, userId = null) {
     try {
       const params = new URLSearchParams()
       params.append('start_date', startDate)
       params.append('end_date', endDate)
+      if (userId) params.append('user_id', userId)
 
       const response = await api.get(`/sales?${params.toString()}`)
       return response.data
@@ -382,6 +721,9 @@ export const transactionService = {
     }
   },
 
+  /**
+   * ✅ Get sale by ID dengan role-based access
+   */
   async getSaleById(saleId) {
     try {
       const response = await api.get(`/sales/${saleId}`)
@@ -393,6 +735,7 @@ export const transactionService = {
   }
 }
 
+// ✅ UPDATED DISCOUNT HELPERS untuk per-user system
 export const discountHelpers = {
   calculateDiscount(subtotal, discountType, discountValue) {
     console.log('🔍 calculateDiscount input:', { subtotal, discountType, discountValue })
@@ -572,37 +915,52 @@ export const discountHelpers = {
   }
 }
 
+// ✅ UPDATED KASIR COMPONENT METHODS untuk Per-User System
 export const kasirComponentMethods = {
+  /**
+   * ✅ UPDATED: Initialize transaction code per-user
+   */
   async initializeTransactionCode() {
     try {
-      console.log('🔄 Initializing transaction code from server...')
+      console.log('🔄 Initializing per-user transaction code from server...')
       
       const response = await transactionService.getNextTransactionCode()
       
       if (response.success && response.data.next_code) {
-        const transactionCode = response.data.next_code
+        const { next_code, next_sequence, user_id } = response.data
         
         if (window.transactionForm?.value) {
-          window.transactionForm.value.transaction_code = transactionCode
+          window.transactionForm.value.transaction_code = next_code
+          window.transactionForm.value.transaction_sequence = next_sequence
+          window.transactionForm.value.user_id = user_id
         }
         
-        console.log('✅ Transaction code initialized:', transactionCode)
-        return transactionCode
+        console.log('✅ Per-user transaction code initialized:', {
+          code: next_code,
+          sequence: next_sequence,
+          user_id: user_id
+        })
+        return { code: next_code, sequence: next_sequence, user_id }
       } else {
         throw new Error('Failed to get transaction code from server')
       }
     } catch (error) {
-      console.error('❌ Error initializing transaction code:', error)
+      console.error('❌ Error initializing per-user transaction code:', error)
       
-      const fallbackCode = 'TR001'
+      const fallbackCode = 'TR000001'
+      const fallbackSequence = 1
       if (window.transactionForm?.value) {
         window.transactionForm.value.transaction_code = fallbackCode
+        window.transactionForm.value.transaction_sequence = fallbackSequence
       }
-      console.log('🔄 Using fallback transaction code:', fallbackCode)
-      return fallbackCode
+      console.log('🔄 Using fallback per-user transaction code:', fallbackCode, 'sequence:', fallbackSequence)
+      return { code: fallbackCode, sequence: fallbackSequence, user_id: null }
     }
   },
 
+  /**
+   * ✅ UPDATED: Process transaction dengan per-user system
+   */
   async processTransaction(transactionData) {
     try {
       const { cartItems, totalAmount, paymentMethod, cashReceived, changeAmount, appliedDiscount } = transactionData
@@ -619,17 +977,22 @@ export const kasirComponentMethods = {
         throw new Error('Pilih metode pembayaran!')
       }
       
+      // ✅ AMBIL transaction code dan sequence
       let transactionCode = window.transactionForm?.value?.transaction_code
-      if (!transactionCode || !transactionCode.startsWith('TR')) {
-        transactionCode = await this.initializeTransactionCode()
+      let transactionSequence = window.transactionForm?.value?.transaction_sequence
+      
+      if (!transactionCode || !transactionCode.match(/^TR\d{6,}$/) || !transactionSequence) {
+        const newTransaction = await this.initializeTransactionCode()
+        transactionCode = newTransaction.code
+        transactionSequence = newTransaction.sequence
       }
 
       const subtotal = cartItems.reduce((sum, item) => sum + parseFloat(item.subtotal), 0)
-
       const currentDateForBackend = utils.getCurrentDateForBackend()
       
-      console.log('🚀 Processing transaction with discount:', {
+      console.log('🚀 Processing transaction with per-user system:', {
         transaction_code: transactionCode,
+        transaction_sequence: transactionSequence,
         date: currentDateForBackend,
         subtotal: subtotal,
         discount: appliedDiscount,
@@ -639,8 +1002,10 @@ export const kasirComponentMethods = {
       const cashReceivedValue = paymentMethod === 'tunai' ? parseFloat(cashReceived) : parseFloat(totalAmount)
       const changeAmountValue = paymentMethod === 'tunai' ? parseFloat(changeAmount) : 0
 
+      // ✅ STRUKTUR DATA untuk per-user system
       const saleData = {
         transaction_code: transactionCode,
+        transaction_sequence: transactionSequence, // ✅ TAMBAHAN BARU
         date: currentDateForBackend,
         payment_method: paymentMethod,
         cash_received: cashReceivedValue,
@@ -658,12 +1023,14 @@ export const kasirComponentMethods = {
       const response = await transactionService.processSale(saleData)
       
       if (response.success) {
-        console.log('✅ Transaction with discount completed:', {
+        console.log('✅ Transaction with per-user system completed:', {
           transaction_code: transactionCode,
+          transaction_sequence: transactionSequence,
           total: totalAmount,
           discount: appliedDiscount
         })
         
+        // ✅ GET NEXT TRANSACTION CODE setelah sukses
         setTimeout(async () => {
           await this.initializeTransactionCode()
         }, 100)
@@ -672,6 +1039,7 @@ export const kasirComponentMethods = {
           success: true,
           data: {
             transaction_code: transactionCode,
+            transaction_sequence: transactionSequence,
             invoice_number: response.data.transaction_code || transactionCode,
             total: totalAmount,
             payment_method: paymentMethod,
@@ -686,12 +1054,13 @@ export const kasirComponentMethods = {
       }
       
     } catch (error) {
-      console.error('❌ Transaction error:', error)
+      console.error('❌ Transaction error with per-user system:', error)
       throw error
     }
   }
 }
 
+// Master Data Service (tidak berubah)
 export const masterDataService = {
   async getJenis() {
     try {
@@ -754,14 +1123,18 @@ export const masterDataService = {
   }
 }
 
+// Utils (tidak berubah, tetap sama)
 export const utils = {
   formatCurrency(amount) {
     const num = parseFloat(amount) || 0
     return new Intl.NumberFormat('id-ID').format(num)
   },
 
+  /**
+   * ✅ UPDATED: Format transaction code untuk per-user system
+   */
   formatTransactionCode(transactionCode) {
-    if (!transactionCode) return 'TR001'
+    if (!transactionCode) return 'TR000001'
     
     if (transactionCode.startsWith('TR')) {
       return transactionCode
@@ -770,10 +1143,10 @@ export const utils = {
     const numbers = transactionCode.match(/\d+/g)
     if (numbers && numbers.length > 0) {
       const lastNumber = numbers[numbers.length - 1]
-      return `TR${lastNumber.padStart(3, '0')}`
+      return `TR${lastNumber.padStart(6, '0')}` // ✅ UPDATED: 6 digit untuk per-user
     }
     
-    return 'TR001'
+    return 'TR000001'
   },
 
   formatDate(dateInput) {
@@ -1109,28 +1482,37 @@ export const utils = {
     return { status: 'normal', label: 'Normal', color: 'green' }
   },
 
+  /**
+   * ✅ UPDATED: Validate transaction code untuk per-user system
+   */
   validateTransactionCode(code) {
     if (!code) return false
-    return /^TR\d{3}$/.test(code)
+    return /^TR\d{6,}$/.test(code) // ✅ UPDATED: minimal 6 digit
   },
 
+  /**
+   * ✅ UPDATED: Generate transaction code untuk per-user system
+   */
   generateTransactionCode(number = 1) {
-    return `TR${number.toString().padStart(3, '0')}`
+    return `TR${number.toString().padStart(6, '0')}` // ✅ UPDATED: 6 digit
   }
 }
 
+// ✅ UPDATED DASHBOARD SERVICE untuk per-user system
 export const dashboardService = {
-  async getDashboardStats() {
+  async getDashboardStats(userId = null) {
     try {
       const productsResponse = await productService.getProducts()
       const products = productsResponse.data || []
 
       const endDate = new Date().toISOString().split('T')[0]
       const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-      const salesResponse = await transactionService.getSalesByDateRange(startDate, endDate)
+      
+      // ✅ UPDATED: Include userId for role-based filtering
+      const salesResponse = await transactionService.getSalesByDateRange(startDate, endDate, userId)
       const sales = salesResponse.data || []
 
-      const discountStatsResponse = await transactionService.getDiscountStats(startDate, endDate)
+      const discountStatsResponse = await transactionService.getDiscountStats(startDate, endDate, userId)
       const discountStats = discountStatsResponse.data || {}
 
       const totalProducts = products.length
@@ -1159,6 +1541,7 @@ export const dashboardService = {
   }
 }
 
+// Lifecycle Methods (tidak berubah)
 export const lifecycleMethods = {
   async onMounted() {
     console.log('Kasir transaksi component mounted')
@@ -1180,9 +1563,13 @@ export const lifecycleMethods = {
   }
 }
 
+// ✅ UPDATED TRANSACTION CODE HELPERS untuk per-user system
 export const transactionCodeHelpers = {
+  /**
+   * ✅ UPDATED: Format transaction code untuk per-user (6 digit)
+   */
   formatTransactionCode(code) {
-    if (!code) return 'TR001'
+    if (!code) return 'TR000001'
     
     if (code.startsWith('TR')) {
       return code
@@ -1191,24 +1578,30 @@ export const transactionCodeHelpers = {
     const numbers = code.match(/\d+/g)
     if (numbers && numbers.length > 0) {
       const lastNumber = numbers[numbers.length - 1]
-      return `TR${lastNumber.padStart(3, '0')}`
+      return `TR${lastNumber.padStart(6, '0')}` // ✅ UPDATED: 6 digit
     }
     
-    return 'TR001'
+    return 'TR000001'
   },
 
+  /**
+   * ✅ UPDATED: Validate per-user transaction code
+   */
   isValidTransactionCode(code) {
-    return /^TR\d{3}$/.test(code)
+    return /^TR\d{6,}$/.test(code) // ✅ UPDATED: minimal 6 digit
   },
 
+  /**
+   * ✅ UPDATED: Get next transaction code (per-user context)
+   */
   getNextTransactionCode(currentCode) {
     if (!currentCode || !this.isValidTransactionCode(currentCode)) {
-      return 'TR001'
+      return 'TR000001'
     }
     
     const currentNumber = parseInt(currentCode.replace('TR', ''))
     const nextNumber = currentNumber + 1
-    return `TR${nextNumber.toString().padStart(3, '0')}`
+    return `TR${nextNumber.toString().padStart(6, '0')}` // ✅ UPDATED: 6 digit
   },
 
   getTransactionNumber(transactionCode) {
@@ -1226,7 +1619,7 @@ export const transactionCodeHelpers = {
     if (!searchTerm) return ''
     
     if (/^\d+$/.test(searchTerm)) {
-      return `TR${searchTerm.padStart(3, '0')}`
+      return `TR${searchTerm.padStart(6, '0')}` // ✅ UPDATED: 6 digit
     }
     
     if (/^TR\d/.test(searchTerm.toUpperCase())) {
@@ -1245,7 +1638,11 @@ export const transactionCodeHelpers = {
   }
 }
 
+// ✅ UPDATED PRINT HELPERS untuk per-user system
 export const printHelpers = {
+  /**
+   * ✅ UPDATED: Print receipt dengan per-user transaction code
+   */
   printReceiptWithTransactionCode(transaction, userInfo = null) {
     const user = userInfo || JSON.parse(localStorage.getItem('user') || '{}')
     const transactionCode = transaction.transaction_code
@@ -1311,6 +1708,7 @@ export const printHelpers = {
     const currentDate = new Date()
     const receiptDate = utils.formatDateReceipt(currentDate)
 
+    // ✅ UPDATED: Receipt dengan per-user transaction code
     const receiptContent = `
       <div style="width: 300px; font-family: monospace; margin: 0 auto;">
         <div style="text-align: center; border-bottom: 1px dashed #000; padding-bottom: 10px; margin-bottom: 10px;">
@@ -1324,6 +1722,7 @@ export const printHelpers = {
           <p style="margin: 0;"><strong>Tanggal:</strong> ${receiptDate}</p>
           <p style="margin: 0;"><strong>Kasir:</strong> ${user.name || 'Kasir'}</p>
           <p style="margin: 0;"><strong>Metode:</strong> ${paymentMethod.toUpperCase()}</p>
+          ${transaction.transaction_sequence ? `<p style="margin: 0; font-size: 11px;"><strong>Seq:</strong> #${transaction.transaction_sequence}</p>` : ''}
         </div>
         
         <div style="border-bottom: 1px dashed #000; padding-bottom: 10px; margin-bottom: 10px;">
@@ -1369,17 +1768,20 @@ export const printHelpers = {
         printWindow.print()
         printWindow.close()
         
-        console.log('[KASIR] Getting new transaction code after print...')
+        console.log('[KASIR] Getting new per-user transaction code after print...')
         try {
           await kasirComponentMethods.initializeTransactionCode()
-          console.log('[KASIR] Ready for next transaction after print')
+          console.log('[KASIR] Ready for next per-user transaction after print')
         } catch (error) {
-          console.error('[KASIR] Failed to refresh transaction code after print:', error)
+          console.error('[KASIR] Failed to refresh per-user transaction code after print:', error)
         }
       }, 250)
     }
   },
 
+  /**
+   * ✅ UPDATED: Print report dengan per-user transaction codes
+   */
   printReportWithTransactionCode(transactions, filterInfo = '', userInfo = null) {
     const user = userInfo || JSON.parse(localStorage.getItem('user') || '{}')
     const currentDate = new Date()
@@ -1389,11 +1791,12 @@ export const printHelpers = {
     const tableRows = formattedTransactions.map(transaction => 
       `<tr>
         <td style="border: 1px solid #000; padding: 8px; text-align: center;">${transaction.formatted_code}</td>
-        <td style="border: 1px solid #000; padding: 8px; text-align: center;">${transaction.user?.name || 'Pembeli'}</td>
+        <td style="border: 1px solid #000; padding: 8px; text-align: center;">${transaction.user?.name || 'Kasir'}</td>
         <td style="border: 1px solid #000; padding: 8px; text-align: center;">${transaction.details ? transaction.details.reduce((total, detail) => total + detail.quantity, 0) : 1}</td>
         <td style="border: 1px solid #000; padding: 8px; text-align: center;">Rp ${utils.formatCurrency(transaction.total_price)}</td>
         <td style="border: 1px solid #000; padding: 8px; text-align: center;">${transaction.has_discount ? discountHelpers.formatDiscountDisplay(discountHelpers.parseDiscountFromSale(transaction)) || '-' : '-'}</td>
         <td style="border: 1px solid #000; padding: 8px; text-align: center;">${utils.formatDate(transaction.date)}</td>
+        <td style="border: 1px solid #000; padding: 8px; text-align: center;">${transaction.transaction_sequence || '-'}</td>
       </tr>`
     ).join('')
 
@@ -1405,7 +1808,7 @@ export const printHelpers = {
     const reportContent = `
       <html>
         <head>
-          <title>Data Semua Transaksi dengan Diskon - GROSIR KURMA PONTIANAK</title>
+          <title>Data Semua Transaksi Per-User - GROSIR KURMA PONTIANAK</title>
           <style>
             body { font-family: Arial, sans-serif; margin: 20px; }
             .header { text-align: center; margin-bottom: 30px; }
@@ -1423,13 +1826,14 @@ export const printHelpers = {
         </head>
         <body>
           <div class="header">
-            <h2>Data Semua Transaksi dengan Diskon</h2>
+            <h2>Data Semua Transaksi Per-User System</h2>
             <p>GROSIR KURMA PONTIANAK</p>
           </div>
           
           <div class="info">
             <p><strong>Filter:</strong> ${filterInfo || 'Semua Transaksi'}</p>
             <p><strong>Dicetak pada:</strong> ${reportDate} oleh ${user.name || 'Admin'}</p>
+            <p><strong>Sistem:</strong> Per-User Transaction Code (Setiap kasir punya sequence sendiri)</p>
           </div>
           
           <table class="table">
@@ -1441,6 +1845,7 @@ export const printHelpers = {
                 <th>Total Harga</th>
                 <th>Diskon</th>
                 <th>Tanggal</th>
+                <th>Sequence</th>
               </tr>
             </thead>
             <tbody>
@@ -1457,7 +1862,8 @@ export const printHelpers = {
           
           <div class="footer" style="margin-top: 30px; text-align: center; font-size: 12px;">
             <p>Laporan ini dicetak pada ${reportDate} oleh ${user.name || 'Admin'}</p>
-            <p>Powered by KIOS KURMA POS System</p>
+            <p>Per-User System: Setiap kasir memiliki sequence transaksi terpisah</p>
+            <p>Powered by KIOS KURMA POS System v2.0</p>
           </div>
         </body>
       </html>

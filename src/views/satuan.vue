@@ -395,7 +395,7 @@ export default {
         if (error.response?.status === 404) {
           this.showToast('error', 'Satuan Tidak Ditemukan', 'Data satuan yang akan dihapus tidak ditemukan');
         } else if (error.response?.status === 400) {
-          const message = error.response.data.message || 'Tidak dapat menghapus satuan yang masih digunakan';
+          const message = error.response.data.message || 'Tidak dapat dihapus karena satuan telah digunakan';
           this.showToast('error', 'Gagal Hapus Satuan', message);
         } else {
           const message = error.response?.data?.message || 'Terjadi kesalahan saat menghapus satuan';

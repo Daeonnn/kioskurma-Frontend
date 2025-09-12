@@ -35,7 +35,7 @@
             </div>
 
             <div class="mb-4">
-              <label class="block text-sm font-medium text-gray-700 mb-2">Kode barang</label>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Kode Produk</label>
               <div class="flex flex-col sm:flex-row gap-2">
                 <input 
                   v-model="transactionForm.product_code"
@@ -578,7 +578,7 @@
             </div>
             
             <div class="flex flex-col sm:flex-row gap-3">
-              <button 
+               <button 
                 @click="printReceiptWithData"
                 class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-md font-medium transition-colors min-h-[48px] flex items-center justify-center"
                 type="button"
@@ -606,10 +606,10 @@
 
 <script>
 import { ref, onMounted, onUnmounted, computed } from 'vue'
-import { productService, transactionService, utils, kasirComponentMethods } from '../../../services/api'
+import { productService, transactionService, utils, kasirComponentMethods } from '../../services/api'
 
 export default {
-  name: 'KasirTransaksi',
+  name: 'AdminTransaksi',
   setup() {
     const showProductModal = ref(false)
     const showToast = ref(false)

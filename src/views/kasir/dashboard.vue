@@ -75,7 +75,7 @@
             </svg>
             <span class="text-2xl sm:text-3xl font-bold">{{ stats.todayTransactions }}</span>
           </div>
-          <p class="text-blue-100 text-sm sm:text-base">Transaksi Hari Ini</p>
+          <p class="text-blue-100 text-sm sm:text-base">Penjualan Hari ini</p>
         </div>
       </div>
 

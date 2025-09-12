@@ -152,17 +152,22 @@
               <div v-if="errors.name" class="text-red-500 text-sm mt-1">{{ errors.name[0] }}</div>
             </div>
 
-            <div class="mb-4">
+           <div class="mb-4">
               <label for="username" class="block text-sm font-medium text-gray-700 mb-2">Username</label>
               <input
                 v-model="form.username"
+                @input="validateUsername"
+                @blur="validateUsername"
                 id="username"
                 type="text"
-                placeholder="Masukkan username"
+                placeholder="Masukkan Nama Pengguna"
+                minlength="6"
                 class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+                :class="{ 'border-red-500': errors.username || usernameError }"
                 required
               />
               <div v-if="errors.username" class="text-red-500 text-sm mt-1">{{ errors.username[0] }}</div>
+              <div v-if="usernameError && !errors.username" class="text-red-500 text-sm mt-1">{{ usernameError }}</div>
             </div>
 
             <div class="mb-4">
@@ -184,7 +189,7 @@
                 v-model="form.password"
                 id="password"
                 type="password"
-                placeholder="Masukkan password"
+                placeholder="Masukkan Kata Sandi"
                 class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
                 :required="!isEditMode"
               />
@@ -197,7 +202,7 @@
                 v-model="form.password_confirmation"
                 id="password_confirmation"
                 type="password"
-                placeholder="Konfirmasi password"
+                placeholder="Konfirmasi Kata Sandi"
                 class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
                 :required="!isEditMode || form.password"
               />
@@ -321,7 +326,7 @@
 </template>
 
 <script>
-import api from '../../services/api'; 
+import api from '../../services/api';
 
 export default {
   name: 'EmployeeManagement',
@@ -337,7 +342,8 @@ export default {
         password_confirmation: '',
         role: '',
       },
-      errors: {},
+      errors: {},           // error dari backend (422)
+      usernameError: '',    // error khusus validasi username
       showForm: false,
       isEditMode: false,
       isSubmitting: false,
@@ -345,201 +351,253 @@ export default {
       toastId: 0,
       showConfirmDialog: false,
       deleteItemId: null
-    }
+    };
   },
 
   methods: {
     showToast(type, title, message = null, duration = 4000) {
-      const id = ++this.toastId
-      const toast = { id, type, title, message }
-      this.toasts.push(toast)
-      setTimeout(() => this.removeToast(id), duration)
+      const id = ++this.toastId;
+      const toast = { id, type, title, message };
+      this.toasts.push(toast);
+      setTimeout(() => this.removeToast(id), duration);
     },
 
     removeToast(id) {
-      const index = this.toasts.findIndex(toast => toast.id === id)
+      const index = this.toasts.findIndex(toast => toast.id === id);
       if (index > -1) {
-        this.toasts.splice(index, 1)
+        this.toasts.splice(index, 1);
       }
     },
 
     formatDate(dateString) {
-      if (!dateString) return '-'
-      const date = new Date(dateString)
+      if (!dateString) return '-';
+      const date = new Date(dateString);
       return date.toLocaleDateString('id-ID', {
         year: 'numeric',
         month: 'long',
         day: 'numeric'
-      })
+      });
+    },
+
+    // === Validasi Username Secara Real-Time ===
+    validateUsername() {
+      const value = this.form.username.trim();
+      this.usernameError = ''; // Reset error
+
+      if (!value) return; // Tidak validasi jika kosong
+
+      if (value.length < 6) {
+        this.usernameError = 'Username harus minimal 6 karakter.';
+        return;
+      }
+
+      const hasLetter = /[a-zA-Z]/.test(value);
+      const hasNumber = /\d/.test(value);
+
+      if (!hasLetter) {
+        this.usernameError = 'Username harus mengandung setidaknya satu huruf.';
+        return;
+      }
+
+      if (!hasNumber) {
+        this.usernameError = 'Username harus mengandung setidaknya satu angka.';
+        return;
+      }
+
+      // Jika semua valid, tidak ada error
     },
 
     // === Get Employees ===
     async getEmployees() {
       try {
-        const response = await api.get('/users') // ✅ Ganti: tidak pakai localhost
+        const response = await api.get('/users');
         if (response.data.success) {
-          this.employees = response.data.data
+          this.employees = response.data.data;
         } else {
-          this.showToast('error', 'Gagal Memuat Data', response.data.message)
+          this.showToast('error', 'Gagal Memuat Data', response.data.message);
         }
       } catch (error) {
-        console.error('Error fetching employees:', error)
-        const message = error.response?.data?.message || 'Terjadi kesalahan saat memuat data'
-        this.showToast('error', 'Gagal Memuat Data', message)
+        console.error('Error fetching employees:', error);
+        const message = error.response?.data?.message || 'Terjadi kesalahan saat memuat data';
+        this.showToast('error', 'Gagal Memuat Data', message);
       }
     },
 
     // === Add Employee ===
     async addEmployee() {
-      this.isSubmitting = true
-      this.errors = {}
+      this.isSubmitting = true;
+      this.errors = {};
+      this.validateUsername(); // Jalankan validasi
+
+      // Cek error dari validasi manual
+      if (this.usernameError) {
+        this.showToast('error', 'Validasi Gagal', 'Perbaiki error pada username');
+        this.isSubmitting = false;
+        return;
+      }
 
       try {
-        const response = await api.post('/users', { // ✅ Ganti
+        const response = await api.post('/users', {
           name: this.form.name,
           username: this.form.username,
           email: this.form.email,
           password: this.form.password,
           password_confirmation: this.form.password_confirmation,
           role: this.form.role,
-        })
+        });
 
         if (response.data.success) {
-          this.showToast('success', 'Berhasil!', response.data.message)
-          this.resetForm()
-          this.closeForm()
-          this.getEmployees()
+          this.showToast('success', 'Berhasil!', response.data.message);
+          this.resetForm();
+          this.closeForm();
+          this.getEmployees();
         } else {
-          this.showToast('error', 'Gagal Menambah Pegawai', response.data.message)
+          this.showToast('error', 'Gagal Menambah Pegawai', response.data.message);
         }
       } catch (error) {
-        console.error('Error adding employee:', error)
+        console.error('Error adding employee:', error);
         if (error.response?.status === 422) {
-          this.errors = error.response.data.errors || {}
-          this.showToast('error', 'Validasi Error', 'Periksa kembali data yang diinput')
+          this.errors = error.response.data.errors || {};
+          // Cek apakah error username dari backend juga muncul
+          if (this.errors.username) {
+            this.usernameError = this.errors.username[0];
+          }
+          this.showToast('error', 'Validasi Error', 'Periksa kembali data yang diinput');
         } else {
-          const message = error.response?.data?.message || 'Terjadi kesalahan saat menambahkan pegawai'
-          this.showToast('error', 'Gagal Menambah Pegawai', message)
+          const message = error.response?.data?.message || 'Terjadi kesalahan saat menambahkan pegawai';
+          this.showToast('error', 'Gagal Menambah Pegawai', message);
         }
       } finally {
-        this.isSubmitting = false
+        this.isSubmitting = false;
       }
     },
 
     // === Edit Employee ===
     editEmployee(employee) {
-      this.form.id = employee.id
-      this.form.name = employee.name
-      this.form.username = employee.username
-      this.form.email = employee.email || ''
-      this.form.password = ''
-      this.form.password_confirmation = ''
-      this.form.role = employee.role || ''
-      this.isEditMode = true
-      this.showForm = true
-      this.errors = {}
+      this.form.id = employee.id;
+      this.form.name = employee.name;
+      this.form.username = employee.username;
+      this.form.email = employee.email || '';
+      this.form.password = '';
+      this.form.password_confirmation = '';
+      this.form.role = employee.role || '';
+      this.isEditMode = true;
+      this.showForm = true;
+      this.errors = {};
+      this.usernameError = ''; // Reset error saat edit
     },
 
     // === Update Employee ===
     async updateEmployee() {
-      this.isSubmitting = true
-      this.errors = {}
+      this.isSubmitting = true;
+      this.errors = {};
+      this.validateUsername(); // Validasi username saat update
+
+      if (this.usernameError) {
+        this.showToast('error', 'Validasi Gagal', 'Perbaiki error pada username');
+        this.isSubmitting = false;
+        return;
+      }
 
       const updateData = {
         name: this.form.name,
         username: this.form.username,
         email: this.form.email,
         role: this.form.role,
-      }
+      };
 
       if (this.form.password) {
-        updateData.password = this.form.password
-        updateData.password_confirmation = this.form.password_confirmation
+        updateData.password = this.form.password;
+        updateData.password_confirmation = this.form.password_confirmation;
       }
 
       try {
-        const response = await api.put(`/users/${this.form.id}`, updateData) // ✅ Ganti
+        const response = await api.put(`/users/${this.form.id}`, updateData);
 
         if (response.data.success) {
-          this.showToast('success', 'Berhasil!', response.data.message)
-          this.resetForm()
-          this.closeForm()
-          this.getEmployees()
+          this.showToast('success', 'Berhasil!', response.data.message);
+          this.resetForm();
+          this.closeForm();
+          this.getEmployees();
         } else {
-          this.showToast('error', 'Gagal Update Pegawai', response.data.message)
+          this.showToast('error', 'Gagal Update Pegawai', response.data.message);
         }
       } catch (error) {
-        console.error('Error updating employee:', error)
+        console.error('Error updating employee:', error);
         if (error.response?.status === 422) {
-          this.errors = error.response.data.errors || {}
-          this.showToast('error', 'Validasi Error', 'Periksa kembali data yang diinput')
+          this.errors = error.response.data.errors || {};
+          if (this.errors.username) {
+            this.usernameError = this.errors.username[0];
+          }
+          this.showToast('error', 'Validasi Error', 'Periksa kembali data yang diinput');
         } else if (error.response?.status === 404) {
-          this.showToast('error', 'Pegawai Tidak Ditemukan', 'Data pegawai yang akan diupdate tidak ditemukan')
+          this.showToast('error', 'Pegawai Tidak Ditemukan', 'Data pegawai yang akan diupdate tidak ditemukan');
         } else {
-          const message = error.response?.data?.message || 'Terjadi kesalahan saat mengupdate pegawai'
-          this.showToast('error', 'Gagal Update Pegawai', message)
+          const message = error.response?.data?.message || 'Terjadi kesalahan saat mengupdate pegawai';
+          this.showToast('error', 'Gagal Update Pegawai', message);
         }
       } finally {
-        this.isSubmitting = false
+        this.isSubmitting = false;
       }
     },
 
     // === Delete Employee ===
     deleteEmployee(id) {
-      this.deleteItemId = id
-      this.showConfirmDialog = true
+      this.deleteItemId = id;
+      this.showConfirmDialog = true;
     },
 
     async confirmDelete() {
       try {
-        const response = await api.delete(`/users/${this.deleteItemId}`) // ✅ Ganti
+        const response = await api.delete(`/users/${this.deleteItemId}`);
 
         if (response.data.success) {
-          this.showToast('success', 'Berhasil!', response.data.message)
-          this.getEmployees()
+          this.showToast('success', 'Berhasil!', response.data.message);
+          this.getEmployees();
         } else {
-          this.showToast('error', 'Gagal Hapus Pegawai', response.data.message)
+          this.showToast('error', 'Gagal Hapus Pegawai', response.data.message);
         }
       } catch (error) {
-        console.error('Error deleting employee:', error)
+        console.error('Error deleting employee:', error);
         if (error.response?.status === 404) {
-          this.showToast('error', 'Pegawai Tidak Ditemukan', 'Data pegawai yang akan dihapus tidak ditemukan')
+          this.showToast('error', 'Pegawai Tidak Ditemukan', 'Data pegawai yang akan dihapus tidak ditemukan');
         } else {
-          const message = error.response?.data?.message || 'Terjadi kesalahan saat menghapus pegawai'
-          this.showToast('error', 'Gagal Hapus Pegawai', message)
+          const message = error.response?.data?.message || 'Terjadi kesalahan saat menghapus pegawai';
+          this.showToast('error', 'Gagal Hapus Pegawai', message);
         }
       } finally {
-        this.cancelDelete()
+        this.cancelDelete();
       }
     },
 
     cancelDelete() {
-      this.showConfirmDialog = false
-      this.deleteItemId = null
+      this.showConfirmDialog = false;
+      this.deleteItemId = null;
     },
 
     resetForm() {
-      this.form.id = null
-      this.form.name = ''
-      this.form.username = ''
-      this.form.email = ''
-      this.form.password = ''
-      this.form.password_confirmation = ''
-      this.form.role = ''
-      this.errors = {}
+      this.form.id = null;
+      this.form.name = '';
+      this.form.username = '';
+      this.form.email = '';
+      this.form.password = '';
+      this.form.password_confirmation = '';
+      this.form.role = '';
+      this.errors = {};
+      this.usernameError = ''; // Reset error username
     },
 
     closeForm() {
-      this.showForm = false
-      this.isEditMode = false
-      this.resetForm()
+      this.showForm = false;
+      this.isEditMode = false;
+      this.resetForm();
     }
   },
 
   mounted() {
-    this.getEmployees()
+    this.getEmployees();
   }
-}
+};
 </script>
 
 <style scoped>

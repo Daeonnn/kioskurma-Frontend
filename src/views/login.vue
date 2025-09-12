@@ -30,7 +30,7 @@
               <input
                 type="text"
                 v-model="loginForm.username"
-                placeholder="USERNAME"
+                placeholder="Nama Pengguna"
                 class="w-full pl-12 pr-4 py-4 bg-white/95 border border-gray-200 text-gray-800 placeholder-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all duration-200 text-sm sm:text-base"
                 required
                 :disabled="loading"
@@ -44,13 +44,46 @@
                 </svg>
               </div>
               <input
-                type="password"
+                :type="showPassword ? 'text' : 'password'"
                 v-model="loginForm.password"
-                placeholder="PASSWORD"
-                class="w-full pl-12 pr-4 py-4 bg-white/95 border border-gray-200 text-gray-800 placeholder-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all duration-200 text-sm sm:text-base"
+                placeholder="Kata Sandi"
+                class="w-full pl-12 pr-12 py-4 bg-white/95 border border-gray-200 text-gray-800 placeholder-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all duration-200 text-sm sm:text-base"
                 required
                 :disabled="loading"
               />
+              <button
+                type="button"
+                @click="togglePassword"
+                class="absolute inset-y-0 right-0 pr-4 flex items-center hover:text-gray-800 transition-colors duration-200"
+                :disabled="loading"
+              >
+                <!-- Icon mata terbuka (ketika password terlihat) -->
+                <svg 
+                  v-if="showPassword" 
+                  class="h-5 w-5 text-gray-600 hover:text-gray-800" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                </svg>
+                <!-- Icon mata tertutup dengan garis silang (ketika password tersembunyi) -->
+                <svg 
+                  v-else 
+                  class="h-5 w-5 text-gray-600 hover:text-gray-800" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                  stroke-width="2"
+                >
+                  <!-- Mata lengkap -->
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"></path>
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                  <!-- Garis silang -->
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M3 3l18 18"></path>
+                </svg>
+              </button>
             </div>
 
             <button
@@ -121,12 +154,14 @@ import api from '../../services/api'
 
 const router = useRouter()
 
+// Reactive variables
 const loginForm = ref({
   username: '',
   password: ''
 })
 
 const loading = ref(false)
+const showPassword = ref(false)
 const showSuccessPopup = ref(false)
 const showCheckmark = ref(false)
 const successPopupClass = ref('scale-95 opacity-0')
@@ -137,20 +172,29 @@ const alert = ref({
   message: ''
 })
 
+// Lifecycle
 onMounted(() => {
   console.log('Login component mounted successfully')
 })
 
+// Computed
 const alertClass = computed(() => {
   return alert.value.type === 'success'
     ? 'bg-green-100 text-green-700'
     : 'bg-red-100 text-red-700'
 })
 
+// Methods
+const togglePassword = () => {
+  showPassword.value = !showPassword.value
+}
+
 const showAlert = (type, message) => {
   try {
     alert.value = { show: true, type, message }
-    setTimeout(hideAlert, 5000)
+    // Kurangi timeout untuk error dari 5000ms ke 3000ms untuk response yang lebih cepat
+    const timeout = type === 'error' ? 3000 : 5000
+    setTimeout(hideAlert, timeout)
   } catch (error) {
     console.error('Error in showAlert:', error)
   }
@@ -185,8 +229,25 @@ const hideSuccessPopup = () => {
   }, 300)
 }
 
-const handleLogin = async () => {
+// Debounce function untuk mencegah multiple submit
+let loginTimeout = null
+const debounceLogin = (func, delay = 1000) => {
+  return (...args) => {
+    if (loginTimeout) {
+      clearTimeout(loginTimeout)
+    }
+    loginTimeout = setTimeout(() => func.apply(this, args), delay)
+  }
+}
+
+const performLogin = async () => {
   console.log('handleLogin function called')
+  
+  // Prevent multiple rapid submissions
+  if (loading.value) {
+    console.log('Login already in progress, ignoring request')
+    return
+  }
   
   try {
     loading.value = true
@@ -194,11 +255,21 @@ const handleLogin = async () => {
 
     console.log('Making login request...')
     
+    // Tambahkan timeout untuk request API (8 detik untuk koneksi yang lambat)
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => {
+      controller.abort()
+    }, 8000) // 8 detik timeout
+
     const response = await api.post('/auth/login', {
       username: loginForm.value.username,
       password: loginForm.value.password
+    }, {
+      signal: controller.signal,
+      timeout: 8000 // Axios timeout sebagai backup
     })
 
+    clearTimeout(timeoutId)
     console.log('Login response received:', response.data)
 
     let token = null
@@ -261,27 +332,50 @@ const handleLogin = async () => {
       }, 2500)
       
     } else {
+      loading.value = false // Set loading false segera
       showAlert('error', 'Login gagal - Token tidak ditemukan')
     }
 
   } catch (error) {
+    loading.value = false // Set loading false segera saat error
     console.error('Login error:', error)
     
     let errorMessage = 'Terjadi kesalahan!'
     
-    if (error.response?.data?.message) {
+    if (error.name === 'AbortError' || error.code === 'ECONNABORTED') {
+      errorMessage = 'Koneksi timeout - Silakan coba lagi!'
+    } else if (error.response?.data?.message) {
       errorMessage = error.response.data.message
     } else if (error.response?.status === 401) {
       errorMessage = 'Username atau password salah!'
+    } else if (error.response?.status === 422) {
+      errorMessage = 'Data yang dimasukkan tidak valid!'
+    } else if (error.response?.status === 500) {
+      errorMessage = 'Server error - Silakan coba lagi!'
     } else if (!error.response) {
       errorMessage = 'Tidak dapat terhubung ke server'
     }
     
     showAlert('error', errorMessage)
-  } finally {
-    loading.value = false
+    
+    // Reset form jika unauthorized
+    if (error.response?.status === 401) {
+      loginForm.value.password = ''
+    }
   }
 }
+
+// Gunakan debounced version untuk handle login
+const handleLogin = debounceLogin(performLogin, 500)
+
+// Clear any existing timeouts on unmount
+onMounted(() => {
+  return () => {
+    if (loginTimeout) {
+      clearTimeout(loginTimeout)
+    }
+  }
+})
 </script>
 
 <style scoped>
@@ -305,5 +399,19 @@ const handleLogin = async () => {
 
 .checkmark-animation {
   animation: checkmark 0.6s ease-in-out;
+}
+
+/* Loading state improvements */
+.loading-overlay {
+  transition: all 0.3s ease;
+}
+
+/* Alert animations */
+.alert-enter-active, .alert-leave-active {
+  transition: all 0.3s ease;
+}
+.alert-enter-from, .alert-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
 }
 </style>
