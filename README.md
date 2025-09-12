@@ -75,3 +75,13 @@ cp .env.example .env
 npm run dev
 # atau
 yarn dev
+
+
+Lalu jika ingin login, tinggal masukkan
+Admin 
+username :yose
+password :adminkurma123
+
+Kasir
+username :elanda
+password :kasirkurma123
